@@ -34,7 +34,7 @@ func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
 	shortURL, err := h.service.GenerateURL(string(body))
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
