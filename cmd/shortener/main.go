@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/go-chi/chi/v5"
+	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/service"
@@ -12,6 +13,8 @@ import (
 
 func main() {
 
+	conf := config.ParseConfig()
+
 	repo := inmemory.NewStorage()
 
 	generator := strgenerator.NewGenerator(
@@ -20,7 +23,7 @@ func main() {
 		42,
 	)
 
-	svc := service.NewShortener("http://localhost:8080", repo, generator)
+	svc := service.NewShortener(conf.UrlShortenerAddress, repo, generator)
 
 	h := chihttp.NewHandler(svc)
 
@@ -29,7 +32,7 @@ func main() {
 	h.RegisterRoutes(r)
 
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    conf.ServerAddress,
 		Handler: r,
 	}
 
