@@ -1,7 +1,6 @@
 package chihttp
 
 import (
-	"fmt"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
@@ -13,13 +12,15 @@ type ShortenerService interface {
 }
 
 type Handler struct {
+	maxBodyLength int64
+
 	service ShortenerService
 }
 
-func NewHandler(service ShortenerService) *Handler {
+func NewHandler(service ShortenerService, maxBodyLength int64) *Handler {
 	return &Handler{
-
-		service: service,
+		maxBodyLength: maxBodyLength,
+		service:       service,
 	}
 }
 
@@ -29,7 +30,7 @@ func (h *Handler) RegisterRoutes(r *chi.Mux) {
 }
 
 func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
-	body, _ := io.ReadAll(r.Body)
+	body, _ := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
 
 	shortURL, err := h.service.GenerateURL(string(body))
 
@@ -41,7 +42,7 @@ func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 
-	fmt.Fprintf(w, "%s", shortURL)
+	w.Write([]byte(shortURL))
 }
 
 func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +55,5 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Location", url)
-
-	w.WriteHeader(http.StatusTemporaryRedirect)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }

@@ -9,6 +9,18 @@ import (
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"log"
 	"net/http"
+	"time"
+)
+
+const (
+	shortUrlLen     = 10
+	shortUrlGenSeed = 42
+
+	serverReadTimeout  = 5 * time.Second
+	serverWriteTimeout = 5 * time.Second
+	serverIdleTimeout  = 30 * time.Second
+
+	handlerMaxBodyLength = 1024 * 1024
 )
 
 func main() {
@@ -19,21 +31,24 @@ func main() {
 
 	generator := strgenerator.NewGenerator(
 		strgenerator.Digits+strgenerator.UppercaseLatin+strgenerator.LowercaseLatin,
-		10,
-		42,
+		shortUrlLen,
+		shortUrlGenSeed,
 	)
 
 	svc := service.NewShortener(conf.UrlShortenerAddress, repo, generator)
 
-	h := chihttp.NewHandler(svc)
+	h := chihttp.NewHandler(svc, handlerMaxBodyLength)
 
 	r := chi.NewRouter()
 
 	h.RegisterRoutes(r)
 
 	server := &http.Server{
-		Addr:    conf.ServerAddress,
-		Handler: r,
+		Addr:         conf.ServerAddress,
+		Handler:      r,
+		ReadTimeout:  serverReadTimeout,
+		WriteTimeout: serverWriteTimeout,
+		IdleTimeout:  serverIdleTimeout,
 	}
 
 	log.Fatal(server.ListenAndServe())

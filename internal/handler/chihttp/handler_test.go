@@ -53,7 +53,7 @@ func TestHandler_GenerateURL(t *testing.T) {
 
 			svc.EXPECT().GenerateURL(tt.body).Return(tt.want.response, tt.wantErr)
 
-			h := NewHandler(svc)
+			h := NewHandler(svc, 1024)
 			mux := chi.NewRouter()
 			h.RegisterRoutes(mux)
 
@@ -109,7 +109,7 @@ func TestHandler_GetURL(t *testing.T) {
 
 			svc.EXPECT().GetURL(tt.url[1:]).Return(tt.want.location, tt.wantErr)
 
-			h := NewHandler(svc)
+			h := NewHandler(svc, 1024)
 			mux := chi.NewRouter()
 			h.RegisterRoutes(mux)
 
@@ -172,7 +172,7 @@ func TestHandler_Router(t *testing.T) {
 				svc.EXPECT().GenerateURL(tt.body).Return(tt.want.response, nil)
 			}
 
-			h := NewHandler(svc)
+			h := NewHandler(svc, 1024)
 			mux := chi.NewRouter()
 			h.RegisterRoutes(mux)
 
