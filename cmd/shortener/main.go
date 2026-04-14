@@ -4,9 +4,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
+	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/service"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"time"
@@ -25,30 +27,46 @@ const (
 
 func main() {
 
+	// init logger
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	defer logger.Sync()
+
+	// parse config
 	conf, err := config.ParseConfig()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal("failed to parse config", zap.Error(err))
 	}
 
-	log.Printf("Server address: %s", conf.ServerAddress)
-	log.Printf("Base url: %s", conf.BaseUrl)
+	logger.Info("Service config",
+		zap.String("server_address", conf.ServerAddress),
+		zap.String("base_url: %s", conf.BaseUrl),
+	)
 
-	repo := inmemory.NewStorage()
+	// init repo
+	repo := inmemory.NewStorage(logger)
 
+	// init generator
 	generator := strgenerator.NewGenerator(
 		strgenerator.Digits+strgenerator.UppercaseLatin+strgenerator.LowercaseLatin,
 		shortUrlLen,
 		shortUrlGenSeed,
 	)
 
-	svc := service.NewShortener(conf.BaseUrl, repo, generator)
+	// init service
+	svc := service.NewShortener(logger, conf.BaseUrl, repo, generator)
 
-	h := chihttp.NewHandler(svc, handlerMaxBodyLength)
+	// init handler
+	h := chihttp.NewHandler(logger, svc, handlerMaxBodyLength)
 
 	r := chi.NewRouter()
+	r.Use(mwlogger.WithLogger(logger))
 
 	h.RegisterRoutes(r)
 
+	// init server
 	server := &http.Server{
 		Addr:         conf.ServerAddress,
 		Handler:      r,
@@ -57,5 +75,7 @@ func main() {
 		IdleTimeout:  serverIdleTimeout,
 	}
 
-	log.Fatal(server.ListenAndServe())
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatal("failed to start server", zap.Error(err))
+	}
 }

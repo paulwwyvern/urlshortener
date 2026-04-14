@@ -2,6 +2,7 @@ package chihttp
 
 import (
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 )
@@ -17,7 +18,8 @@ type Handler struct {
 	service ShortenerService
 }
 
-func NewHandler(service ShortenerService, maxBodyLength int64) *Handler {
+func NewHandler(logger *zap.Logger, service ShortenerService, maxBodyLength int64) *Handler {
+	logger.Info("Initializing chi handlers")
 	return &Handler{
 		maxBodyLength: maxBodyLength,
 		service:       service,

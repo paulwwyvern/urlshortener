@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"go.uber.org/zap"
 )
 
 // Репа где хранятся ссылки
@@ -18,14 +19,20 @@ type UrlGenerator interface {
 }
 
 type ShortenerService struct {
+	logger *zap.Logger
+
 	baseUrl string
 
 	urlRepo UrlRepository
 	urlGen  UrlGenerator
 }
 
-func NewShortener(baseUrl string, urlRepo UrlRepository, urlGen UrlGenerator) *ShortenerService {
+func NewShortener(logger *zap.Logger, baseUrl string, urlRepo UrlRepository, urlGen UrlGenerator) *ShortenerService {
+	logger.Info("Creating shortener service")
+
 	return &ShortenerService{
+		logger: logger,
+
 		baseUrl: baseUrl,
 
 		urlRepo: urlRepo,
@@ -45,6 +52,11 @@ func (s *ShortenerService) GenerateURL(url string) (string, error) {
 		shortUrl = s.urlGen.Generate()
 		err = s.urlRepo.SaveURL(shortUrl, url)
 	}
+
+	s.logger.Info("New url generated",
+		zap.String("url", url),
+		zap.String("shortUrl", shortUrl),
+	)
 
 	return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), nil
 }
