@@ -25,7 +25,13 @@ const (
 
 func main() {
 
-	conf := config.ParseConfig()
+	conf, err := config.ParseConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Server address: %s", conf.ServerAddress)
+	log.Printf("Base url: %s", conf.BaseUrl)
 
 	repo := inmemory.NewStorage()
 
@@ -35,7 +41,7 @@ func main() {
 		shortUrlGenSeed,
 	)
 
-	svc := service.NewShortener(conf.UrlShortenerAddress, repo, generator)
+	svc := service.NewShortener(conf.BaseUrl, repo, generator)
 
 	h := chihttp.NewHandler(svc, handlerMaxBodyLength)
 

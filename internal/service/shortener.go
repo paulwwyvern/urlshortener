@@ -18,15 +18,15 @@ type UrlGenerator interface {
 }
 
 type ShortenerService struct {
-	hostname string
+	baseUrl string
 
 	urlRepo UrlRepository
 	urlGen  UrlGenerator
 }
 
-func NewShortener(hostname string, urlRepo UrlRepository, urlGen UrlGenerator) *ShortenerService {
+func NewShortener(baseUrl string, urlRepo UrlRepository, urlGen UrlGenerator) *ShortenerService {
 	return &ShortenerService{
-		hostname: hostname,
+		baseUrl: baseUrl,
 
 		urlRepo: urlRepo,
 		urlGen:  urlGen,
@@ -46,7 +46,7 @@ func (s *ShortenerService) GenerateURL(url string) (string, error) {
 		err = s.urlRepo.SaveURL(shortUrl, url)
 	}
 
-	return fmt.Sprintf("%s/%s", s.hostname, shortUrl), nil
+	return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), nil
 }
 
 func (s *ShortenerService) GetURL(shortUrl string) (string, error) {
