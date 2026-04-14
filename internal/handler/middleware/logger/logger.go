@@ -45,6 +45,9 @@ func WithLogger(logger *zap.Logger) func(h http.Handler) http.Handler {
 
 			duration := time.Since(start)
 
+			logger.Info("content type",
+				zap.String("content type", ww.Header().Get("Content-Type")))
+
 			logger.Info("Get request",
 				zap.String("uri", uri),
 				zap.String("method", method),

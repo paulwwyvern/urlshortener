@@ -9,7 +9,6 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/service"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
-	"log"
 	"net/http"
 	"time"
 )
@@ -76,6 +75,6 @@ func main() {
 	}
 
 	if err := server.ListenAndServe(); err != nil {
-		log.Fatal("failed to start server", zap.Error(err))
+		logger.Fatal("failed to start server", zap.Error(err))
 	}
 }
