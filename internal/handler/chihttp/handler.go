@@ -83,11 +83,11 @@ func (h *Handler) GenerateUrlJson(w http.ResponseWriter, r *http.Request) {
 		Result: url,
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
 	err = json.NewEncoder(w).Encode(res)
 
-	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return

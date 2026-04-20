@@ -16,6 +16,13 @@ type loggerResponseWriter struct {
 	responseData *responseData
 }
 
+func newLoggerResponseWriter(w http.ResponseWriter, response *responseData) *loggerResponseWriter {
+	return &loggerResponseWriter{
+		ResponseWriter: w,
+		responseData:   response,
+	}
+}
+
 func (w *loggerResponseWriter) Write(data []byte) (int, error) {
 	size, err := w.ResponseWriter.Write(data)
 	w.responseData.size += size
@@ -36,17 +43,10 @@ func WithLogger(logger *zap.Logger) func(h http.Handler) http.Handler {
 			method := r.Method
 
 			response := &responseData{}
-			ww := &loggerResponseWriter{
-				ResponseWriter: w,
-				responseData:   response,
-			}
-
+			ww := newLoggerResponseWriter(w, response)
 			h.ServeHTTP(ww, r)
 
 			duration := time.Since(start)
-
-			logger.Info("content type",
-				zap.String("content type", ww.Header().Get("Content-Type")))
 
 			logger.Info("Get request",
 				zap.String("uri", uri),
@@ -54,6 +54,11 @@ func WithLogger(logger *zap.Logger) func(h http.Handler) http.Handler {
 				zap.Int("response status", response.status),
 				zap.Int("response size", response.size),
 				zap.Duration("duration", duration),
+				zap.String("request content type", r.Header.Get("Content-Type")),
+				zap.String("response content type", ww.Header().Get("Content-Type")),
+				zap.String("request content encoding", r.Header.Get("Content-Encoding")),
+				zap.String("accept encoding", r.Header.Get("Accept-Encoding")),
+				zap.String("response content encoding", ww.Header().Get("Content-Encoding")),
 			)
 
 		})

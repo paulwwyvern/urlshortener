@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
+	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/service"
@@ -62,6 +63,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(mwlogger.WithLogger(logger))
+	r.Use(mwcompress.WithCompress())
 
 	h.RegisterRoutes(r)
 
