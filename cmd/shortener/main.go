@@ -6,7 +6,7 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
-	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
+	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
 	"github.com/paulwwyvern/urlshortener/internal/service"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
@@ -46,7 +46,11 @@ func main() {
 	)
 
 	// init repo
-	repo := inmemory.NewStorage(logger)
+	repo, err := file.NewStorage(conf.FileStoragePath, logger)
+	if err != nil {
+		logger.Fatal("failed to init storage", zap.Error(err))
+	}
+	defer repo.Close()
 
 	// init generator
 	generator := strgenerator.NewGenerator(
