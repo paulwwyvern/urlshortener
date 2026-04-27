@@ -4,13 +4,14 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 	"testing"
 )
 
 func TestShortenerService_GenerateURL_Success(t *testing.T) {
 	tests := []struct {
-		name     string
-		hostname string
+		name    string
+		baseUrl string
 
 		url         string
 		genShortUrl string
@@ -20,7 +21,7 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 	}{
 		{
 			name:        "Test #1 Success",
-			hostname:    "http://localhost:8080",
+			baseUrl:     "http://localhost:8080",
 			url:         "http://example.com",
 			genShortUrl: "H3dsKvz9o",
 
@@ -28,7 +29,7 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 			wantErr: nil,
 		}, {
 			name:        "Test #2 Success",
-			hostname:    "http://127.0.0.1:9090",
+			baseUrl:     "http://127.0.0.1:9090",
 			url:         "http://yandex.ru",
 			genShortUrl: "DlOi82Xkf",
 
@@ -36,6 +37,9 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 			wantErr: nil,
 		},
 	}
+
+	logger := zap.NewNop()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -48,7 +52,7 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 
 			repo.EXPECT().SaveURL(tt.genShortUrl, tt.url).Return(nil)
 
-			srv := NewShortener(tt.hostname, repo, gen)
+			srv := NewShortener(logger, tt.baseUrl, repo, gen)
 
 			shortUrl, err := srv.GenerateURL(tt.url)
 
@@ -64,6 +68,7 @@ func TestShortenerService_GenerateURL_Collision(t *testing.T) {
 		defer ctrl.Finish()
 		gen := NewMockUrlGenerator(ctrl)
 		repo := NewMockUrlRepository(ctrl)
+		logger := zap.NewNop()
 
 		gomock.InOrder(
 			gen.EXPECT().Generate().Return("H3dsKvz9o"),
@@ -72,7 +77,7 @@ func TestShortenerService_GenerateURL_Collision(t *testing.T) {
 			repo.EXPECT().SaveURL("DlOi82Xkf", "http://example.com").Return(nil),
 		)
 
-		srv := NewShortener("http://example.com", repo, gen)
+		srv := NewShortener(logger, "http://example.com", repo, gen)
 
 		shortUrl, err := srv.GenerateURL("http://example.com")
 
@@ -106,6 +111,8 @@ func TestShortenerService_GetURL(t *testing.T) {
 		},
 	}
 
+	logger := zap.NewNop()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -114,7 +121,7 @@ func TestShortenerService_GetURL(t *testing.T) {
 			repo := NewMockUrlRepository(ctrl)
 			repo.EXPECT().GetURL("H3dsKvz9o").Return(tt.want, tt.wantErr)
 
-			srv := NewShortener("", repo, gen)
+			srv := NewShortener(logger, "", repo, gen)
 
 			shortUrl, err := srv.GetURL("H3dsKvz9o")
 			assert.ErrorIs(t, err, tt.wantErr)

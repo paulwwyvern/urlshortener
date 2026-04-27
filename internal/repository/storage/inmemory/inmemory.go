@@ -2,6 +2,7 @@ package inmemory
 
 import (
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"go.uber.org/zap"
 	"sync"
 )
 
@@ -10,7 +11,8 @@ type Storage struct {
 	storage map[string]string
 }
 
-func NewStorage() *Storage {
+func NewStorage(logger *zap.Logger) *Storage {
+	logger.Info("Initializing in-memory storage")
 	return &Storage{
 		storage: make(map[string]string),
 	}

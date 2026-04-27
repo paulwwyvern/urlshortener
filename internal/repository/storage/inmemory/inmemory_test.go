@@ -3,6 +3,7 @@ package inmemory
 import (
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"testing"
 )
 
@@ -36,9 +37,11 @@ func TestStorage_GetURL(t *testing.T) {
 		},
 	}
 
+	logger := zap.NewNop()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewStorage()
+			s := NewStorage(logger)
 			s.storage = tt.storage
 			got, err := s.GetURL(tt.shortUrl)
 			assert.Equal(t, tt.want, got)
@@ -82,9 +85,10 @@ func TestStorage_SaveURL(t *testing.T) {
 		},
 	}
 
+	logger := zap.NewNop()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := NewStorage()
+			s := NewStorage(logger)
 			s.storage = tt.storage
 			err := s.SaveURL(tt.shortUrl, tt.url)
 
