@@ -52,9 +52,10 @@ func TestHandler_GenerateURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
+
 			svc := NewMockShortenerService(ctrl)
 
-			svc.EXPECT().GenerateURL(tt.body).Return(tt.want.response, tt.wantErr)
+			svc.EXPECT().GenerateURL(gomock.Any(), tt.body).Return(tt.want.response, tt.wantErr)
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
@@ -112,7 +113,7 @@ func TestHandler_GetURL(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := NewMockShortenerService(ctrl)
 
-			svc.EXPECT().GetURL(tt.url[1:]).Return(tt.want.location, tt.wantErr)
+			svc.EXPECT().GetURL(gomock.Any(), tt.url[1:]).Return(tt.want.location, tt.wantErr)
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
@@ -179,7 +180,7 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := NewMockShortenerService(ctrl)
 
-			svc.EXPECT().GenerateURL(tt.request).Return(tt.want.response, tt.wantErr)
+			svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, tt.wantErr)
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
@@ -258,10 +259,10 @@ func TestHandler_Router(t *testing.T) {
 			svc := NewMockShortenerService(ctrl)
 
 			if tt.method == http.MethodGet {
-				svc.EXPECT().GetURL(tt.url[1:]).Return(tt.want.location, nil)
+				svc.EXPECT().GetURL(gomock.Any(), tt.url[1:]).Return(tt.want.location, nil)
 			}
 			if tt.method == http.MethodPost {
-				svc.EXPECT().GenerateURL(tt.request).Return(tt.want.response, nil)
+				svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, nil)
 			}
 
 			h := NewHandler(logger, svc, 1024)

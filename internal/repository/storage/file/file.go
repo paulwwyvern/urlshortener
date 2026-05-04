@@ -1,7 +1,9 @@
 package file
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"go.uber.org/zap"
@@ -47,18 +49,18 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 	storage := inmemory.NewStorage(zap.NewNop())
 
-	url := model.Url{}
+	url := model.URL{}
 
 	for {
 		err = decoder.Decode(&url)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, err
 		}
 
-		err = storage.SaveURL(url.ShortUrl, url.OriginalUrl)
+		err = storage.SaveURL(context.Background(), url.ShortUrl, url.OriginalUrl)
 		if err != nil {
 			return nil, err
 		}
@@ -68,13 +70,13 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 }
 
-func (s *Storage) SaveURL(shortUrl string, originalUrl string) error {
-	err := s.Storage.SaveURL(shortUrl, originalUrl)
+func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl string) error {
+	err := s.Storage.SaveURL(ctx, shortUrl, originalUrl)
 	if err != nil {
 		return err
 	}
 
-	url := model.Url{
+	url := model.URL{
 		ShortUrl:    shortUrl,
 		OriginalUrl: originalUrl,
 	}

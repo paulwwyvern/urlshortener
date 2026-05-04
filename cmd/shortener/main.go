@@ -1,16 +1,22 @@
 package main
 
 import (
+	"context"
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
+	mwcontext "github.com/paulwwyvern/urlshortener/internal/handler/middleware/context"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
 	"github.com/paulwwyvern/urlshortener/internal/service"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -23,14 +29,20 @@ const (
 	serverIdleTimeout  = 30 * time.Second
 
 	handlerMaxBodyLength = 1024 * 1024
+
+	shutdownTimeout = 5 * time.Second
 )
 
 func main() {
 
+	// init context
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	// init logger
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer logger.Sync()
 
@@ -66,6 +78,7 @@ func main() {
 	h := chihttp.NewHandler(logger, svc, handlerMaxBodyLength)
 
 	r := chi.NewRouter()
+	r.Use(mwcontext.WithContext(ctx))
 	r.Use(mwlogger.WithLogger(logger))
 	r.Use(mwcompress.WithCompress())
 
@@ -80,7 +93,28 @@ func main() {
 		IdleTimeout:  serverIdleTimeout,
 	}
 
-	if err := server.ListenAndServe(); err != nil {
+	// run server
+	servErr := make(chan error)
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			servErr <- err
+		}
+	}()
+
+	select {
+	case err := <-servErr:
 		logger.Fatal("failed to start server", zap.Error(err))
+		os.Exit(1)
+	case <-ctx.Done():
+		stop()
+		logger.Info("shutdown signal received")
 	}
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Fatal("failed to graceful shutdown server", zap.Error(err))
+	}
+	logger.Info("shutdown complete")
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -50,11 +51,11 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 
 			gen.EXPECT().Generate().Return(tt.genShortUrl)
 
-			repo.EXPECT().SaveURL(tt.genShortUrl, tt.url).Return(nil)
+			repo.EXPECT().SaveURL(gomock.Any(), tt.genShortUrl, tt.url).Return(nil)
 
 			srv := NewShortener(logger, tt.baseUrl, repo, gen)
 
-			shortUrl, err := srv.GenerateURL(tt.url)
+			shortUrl, err := srv.GenerateURL(context.Background(), tt.url)
 
 			assert.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.want, shortUrl)
@@ -72,14 +73,14 @@ func TestShortenerService_GenerateURL_Collision(t *testing.T) {
 
 		gomock.InOrder(
 			gen.EXPECT().Generate().Return("H3dsKvz9o"),
-			repo.EXPECT().SaveURL("H3dsKvz9o", "http://example.com").Return(errs.ErrShortUrlAlreadyExists),
+			repo.EXPECT().SaveURL(gomock.Any(), "H3dsKvz9o", "http://example.com").Return(errs.ErrShortUrlAlreadyExists),
 			gen.EXPECT().Generate().Return("DlOi82Xkf"),
-			repo.EXPECT().SaveURL("DlOi82Xkf", "http://example.com").Return(nil),
+			repo.EXPECT().SaveURL(gomock.Any(), "DlOi82Xkf", "http://example.com").Return(nil),
 		)
 
 		srv := NewShortener(logger, "http://example.com", repo, gen)
 
-		shortUrl, err := srv.GenerateURL("http://example.com")
+		shortUrl, err := srv.GenerateURL(context.Background(), "http://example.com")
 
 		assert.ErrorIs(t, err, nil)
 		assert.Equal(t, shortUrl, "http://example.com/DlOi82Xkf")
@@ -119,11 +120,11 @@ func TestShortenerService_GetURL(t *testing.T) {
 			defer ctrl.Finish()
 			gen := NewMockUrlGenerator(ctrl)
 			repo := NewMockUrlRepository(ctrl)
-			repo.EXPECT().GetURL("H3dsKvz9o").Return(tt.want, tt.wantErr)
+			repo.EXPECT().GetURL(gomock.Any(), "H3dsKvz9o").Return(tt.want, tt.wantErr)
 
 			srv := NewShortener(logger, "", repo, gen)
 
-			shortUrl, err := srv.GetURL("H3dsKvz9o")
+			shortUrl, err := srv.GetURL(context.Background(), "H3dsKvz9o")
 			assert.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.want, shortUrl)
 		})

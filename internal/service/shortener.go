@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
@@ -9,8 +10,8 @@ import (
 
 // Репа где хранятся ссылки
 type UrlRepository interface {
-	GetURL(string) (string, error)
-	SaveURL(shortUrl string, url string) error
+	GetURL(context.Context, string) (string, error)
+	SaveURL(ctx context.Context, shortUrl string, url string) error
 }
 
 // Генератор коротких ссылок
@@ -40,17 +41,17 @@ func NewShortener(logger *zap.Logger, baseUrl string, urlRepo UrlRepository, url
 	}
 }
 
-func (s *ShortenerService) GenerateURL(url string) (string, error) {
+func (s *ShortenerService) GenerateURL(ctx context.Context, url string) (string, error) {
 	shortUrl := s.urlGen.Generate()
 
-	err := s.urlRepo.SaveURL(shortUrl, url)
+	err := s.urlRepo.SaveURL(ctx, shortUrl, url)
 
 	for err != nil {
 		if !errors.Is(err, errs.ErrShortUrlAlreadyExists) {
 			return "", err
 		}
 		shortUrl = s.urlGen.Generate()
-		err = s.urlRepo.SaveURL(shortUrl, url)
+		err = s.urlRepo.SaveURL(ctx, shortUrl, url)
 	}
 
 	s.logger.Info("New url generated",
@@ -61,8 +62,8 @@ func (s *ShortenerService) GenerateURL(url string) (string, error) {
 	return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), nil
 }
 
-func (s *ShortenerService) GetURL(shortUrl string) (string, error) {
-	url, err := s.urlRepo.GetURL(shortUrl)
+func (s *ShortenerService) GetURL(ctx context.Context, shortUrl string) (string, error) {
+	url, err := s.urlRepo.GetURL(ctx, shortUrl)
 	if err != nil {
 		return "", err
 	}

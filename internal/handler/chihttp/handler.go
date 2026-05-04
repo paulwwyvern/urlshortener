@@ -1,17 +1,20 @@
 package chihttp
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/model"
+	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
 )
 
 type ShortenerService interface {
-	GenerateURL(url string) (string, error)
-	GetURL(shortURL string) (string, error)
+	GenerateURL(ctx context.Context, url string) (string, error)
+	GetURL(ctx context.Context, shortURL string) (string, error)
 }
 
 type Handler struct {
@@ -31,16 +34,32 @@ func NewHandler(logger *zap.Logger, service ShortenerService, maxBodyLength int6
 func (h *Handler) RegisterRoutes(r *chi.Mux) {
 	r.Get("/{url}", h.GetURL)
 	r.Post("/", h.GenerateURL)
-	r.Post("/api/shorten", h.GenerateUrlJson)
+	r.Post("/api/shorten", h.GenerateURLJson)
 }
 
 func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
-	body, _ := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
+	ctx := r.Context()
 
-	shortURL, err := h.service.GenerateURL(string(body))
+	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
+	if err != nil {
+		if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, context.Canceled) {
+			w.WriteHeader(http.StatusBadRequest)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			w.WriteHeader(http.StatusRequestTimeout)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	shortURL, err := h.service.GenerateURL(ctx, string(body))
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		if errors.Is(err, errs.ErrInternalError) {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
 		return
 	}
 
@@ -51,35 +70,59 @@ func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	shortURL := chi.URLParam(r, "url")
 
-	url, err := h.service.GetURL(shortURL)
+	url, err := h.service.GetURL(ctx, shortURL)
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		if errors.Is(err, errs.ErrShortUrlNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+		} else if errors.Is(err, errs.ErrInternalError) {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
 		return
 	}
 
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func (h *Handler) GenerateUrlJson(w http.ResponseWriter, r *http.Request) {
-	body, _ := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
+func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
-	req := model.GenerateUrlJsonRequest{}
-	err := json.Unmarshal(body, &req)
+	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
+	if err != nil {
+		if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, context.Canceled) {
+			w.WriteHeader(http.StatusBadRequest)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			w.WriteHeader(http.StatusRequestTimeout)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	req := model.GenerateURLJsonRequest{}
+	err = json.Unmarshal(body, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	url, err := h.service.GenerateURL(req.Url)
+	url, err := h.service.GenerateURL(ctx, req.URL)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		if errors.Is(err, errs.ErrInternalError) {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
 		return
 	}
 
-	res := model.GenerateUrlJsonResponse{
+	res := model.GenerateURLJsonResponse{
 		Result: url,
 	}
 
@@ -89,7 +132,7 @@ func (h *Handler) GenerateUrlJson(w http.ResponseWriter, r *http.Request) {
 	err = json.NewEncoder(w).Encode(res)
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 

@@ -1,6 +1,7 @@
 package inmemory
 
 import (
+	"context"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
 	"sync"
@@ -18,7 +19,7 @@ func NewStorage(logger *zap.Logger) *Storage {
 	}
 }
 
-func (s *Storage) GetURL(shortUrl string) (string, error) {
+func (s *Storage) GetURL(_ context.Context, shortUrl string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -30,7 +31,7 @@ func (s *Storage) GetURL(shortUrl string) (string, error) {
 	return url, nil
 }
 
-func (s *Storage) SaveURL(shortUrl string, url string) error {
+func (s *Storage) SaveURL(_ context.Context, shortUrl string, url string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, ok := s.storage[shortUrl]
