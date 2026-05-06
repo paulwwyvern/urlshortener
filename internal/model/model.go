@@ -4,6 +4,7 @@ type URL struct {
 	ID          string `json:",omitempty"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+	IsExist     bool   `json:"-"`
 }
 
 type GenerateURLBatchRequest struct {

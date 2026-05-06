@@ -89,6 +89,8 @@ func main() {
 		shortUrlGenSeed,
 	)
 
+	logger.Info("Init random generator")
+
 	// init service
 	svc := service.NewShortener(logger, conf.BaseUrl, batchSize, repo, generator)
 

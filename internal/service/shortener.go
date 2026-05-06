@@ -11,7 +11,8 @@ import (
 
 // Репа где хранятся ссылки
 type UrlRepository interface {
-	GetURL(context.Context, string) (string, error)
+	GetURL(ctx context.Context, shortUrl string) (string, error)
+	GetShortURL(ctx context.Context, url string) (string, error)
 	SaveURL(ctx context.Context, shortUrl string, url string) error
 	SaveURLBatch(ctx context.Context, urls []model.URL) error
 	Ping(context.Context) error
@@ -48,12 +49,22 @@ func NewShortener(logger *zap.Logger, baseUrl string, batchSize int, urlRepo Url
 }
 
 func (s *ShortenerService) GenerateURL(ctx context.Context, url string) (string, error) {
+
 	shortUrl := s.urlGen.Generate()
 
 	err := s.urlRepo.SaveURL(ctx, shortUrl, url)
 
 	var attempts int
 	for err != nil {
+		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
+			shortUrl, err := s.urlRepo.GetShortURL(ctx, url)
+			if err != nil {
+				return "", err
+			}
+
+			return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), errs.ErrOriginalUrlAlreadyExists
+
+		}
 		if !errors.Is(err, errs.ErrShortUrlAlreadyExists) {
 			return "", err
 		}
@@ -67,15 +78,12 @@ func (s *ShortenerService) GenerateURL(ctx context.Context, url string) (string,
 		zap.String("shortUrl", shortUrl),
 		zap.Int("attempts", attempts),
 	)
-
 	return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), nil
 }
 
 func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error) {
 	batch := make([]model.URL, 0, s.batchSize)
 	shortUrls := make([]model.GenerateURLBatchResponse, 0, len(urls))
-
-	exist := make(map[string]struct{})
 
 	var attempts int
 	var offset int
@@ -88,14 +96,7 @@ func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.Ge
 		// генерим шорты
 		for _, url := range urlsBatch {
 			var shortUrl string
-			for {
-				shortUrl = s.urlGen.Generate()
-				if _, ok := exist[shortUrl]; ok {
-					continue
-				}
-				exist[shortUrl] = struct{}{}
-				break
-			}
+			shortUrl = s.urlGen.Generate()
 
 			batch = append(batch, model.URL{
 				ID:          url.ID,
@@ -104,8 +105,11 @@ func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.Ge
 			})
 		}
 		// если нашлась коллизия в базе
-		if err := s.urlRepo.SaveURLBatch(ctx, batch); err != nil {
+		err := s.urlRepo.SaveURLBatch(ctx, batch)
+
+		if err != nil {
 			if errors.Is(err, errs.ErrShortUrlAlreadyExists) {
+				// коллизия из за сгенеренных урлов, генерим батч заново
 				offset -= s.batchSize
 				batch = batch[:0]
 				continue
@@ -115,30 +119,36 @@ func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.Ge
 		}
 
 		for _, url := range batch {
-			s.logger.Info("New url generated",
-				zap.String("url", url.OriginalURL),
-				zap.String("shortUrl", url.ShortURL),
-				zap.Int("attempts", attempts),
-			)
+
+			if !url.IsExist {
+				s.logger.Info("New url generated",
+					zap.String("url", url.OriginalURL),
+					zap.String("shortUrl", url.ShortURL),
+					zap.Int("attempts", attempts),
+				)
+			} else {
+				s.logger.Info("Trying generated existing url",
+					zap.String("url", url.OriginalURL),
+					zap.String("shortUrl", url.ShortURL),
+				)
+			}
 
 			shortUrls = append(shortUrls, model.GenerateURLBatchResponse{
 				ID:       url.ID,
 				ShortURL: fmt.Sprintf("%s/%s", s.baseUrl, url.ShortURL),
 			})
 		}
+
 		attempts = 0
 		batch = batch[:0]
 	}
+
 	return shortUrls, nil
 
 }
 
 func (s *ShortenerService) GetURL(ctx context.Context, shortUrl string) (string, error) {
-	url, err := s.urlRepo.GetURL(ctx, shortUrl)
-	if err != nil {
-		return "", err
-	}
-	return url, nil
+	return s.urlRepo.GetURL(ctx, shortUrl)
 }
 
 func (s *ShortenerService) Ping(ctx context.Context) error {

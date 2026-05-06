@@ -59,17 +59,21 @@ func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
 
 	shortURL, err := h.service.GenerateURL(ctx, string(body))
 
-	if err != nil {
-		if errors.Is(err, errs.ErrInternalError) {
-			w.WriteHeader(http.StatusInternalServerError)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-		}
-		return
-	}
-
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
+	if err != nil {
+		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			if errors.Is(err, errs.ErrInternalError) {
+				w.WriteHeader(http.StatusInternalServerError)
+			} else {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+			return
+		}
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 
 	w.Write([]byte(shortURL))
 }
@@ -117,21 +121,26 @@ func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	url, err := h.service.GenerateURL(ctx, req.URL)
+
+	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
-		if errors.Is(err, errs.ErrInternalError) {
-			w.WriteHeader(http.StatusInternalServerError)
+		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
+			w.WriteHeader(http.StatusConflict)
 		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			if errors.Is(err, errs.ErrInternalError) {
+				w.WriteHeader(http.StatusInternalServerError)
+			} else {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+			return
 		}
-		return
+	} else {
+		w.WriteHeader(http.StatusCreated)
 	}
 
 	res := model.GenerateURLJsonResponse{
 		Result: url,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 
 	err = json.NewEncoder(w).Encode(res)
 

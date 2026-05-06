@@ -1,7 +1,7 @@
 
 CREATE TABLE url (
     id SERIAL PRIMARY KEY,
-    short_url VARCHAR(80) UNIQUE NOT NULL,
+    short_url VARCHAR(80) NOT NULL,
     url VARCHAR(255) NOT NULL
 );
 

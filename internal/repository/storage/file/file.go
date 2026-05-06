@@ -101,11 +101,17 @@ func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
 			ShortURL:    url.ShortURL,
 			OriginalURL: url.OriginalURL,
 		}
-		err = s.encoder.Encode(&u)
-	}
 
-	if err != nil {
-		return err
+		if url.IsExist {
+			continue
+		}
+
+		err = s.encoder.Encode(&u)
+
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil
