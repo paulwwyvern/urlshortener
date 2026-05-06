@@ -15,6 +15,7 @@ import (
 type ShortenerService interface {
 	GenerateURL(ctx context.Context, url string) (string, error)
 	GetURL(ctx context.Context, shortURL string) (string, error)
+	GenerateURLBatch(ctx context.Context, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error)
 	Ping(ctx context.Context) error
 }
 
@@ -33,10 +34,12 @@ func NewHandler(logger *zap.Logger, service ShortenerService, maxBodyLength int6
 }
 
 func (h *Handler) RegisterRoutes(r *chi.Mux) {
-	r.Get("/ping", h.Ping)
 	r.Get("/{url}", h.GetURL)
+	r.Get("/ping", h.Ping)
 	r.Post("/", h.GenerateURL)
 	r.Post("/api/shorten", h.GenerateURLJson)
+	r.Post("/api/shorten/batch", h.GenerateURLJsonBatch)
+
 }
 
 func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +95,7 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
-	//ctx := r.Context()
+	ctx := r.Context()
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
 	if err != nil {
@@ -113,7 +116,7 @@ func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url, err := h.service.GenerateURL(context.Background(), req.URL)
+	url, err := h.service.GenerateURL(ctx, req.URL)
 	if err != nil {
 		if errors.Is(err, errs.ErrInternalError) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -136,7 +139,49 @@ func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
 
+func (h *Handler) GenerateURLJsonBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
+	if err != nil {
+		if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, context.Canceled) {
+			w.WriteHeader(http.StatusBadRequest)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			w.WriteHeader(http.StatusRequestTimeout)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	req := []model.GenerateURLBatchRequest{}
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	res, err := h.service.GenerateURLBatch(ctx, req)
+	if err != nil {
+		if errors.Is(err, errs.ErrInternalError) {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	err = json.NewEncoder(w).Encode(res)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {

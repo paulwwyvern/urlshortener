@@ -49,7 +49,7 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 	storage, _ := inmemory.NewStorage(zap.NewNop())
 
-	url := model.URL{}
+	url := model.URLFile{}
 
 	for {
 		err = decoder.Decode(&url)
@@ -60,7 +60,7 @@ func readStorage(file string) (*inmemory.Storage, error) {
 			return nil, err
 		}
 
-		err = storage.SaveURL(context.Background(), url.ShortUrl, url.OriginalUrl)
+		err = storage.SaveURL(context.Background(), url.ShortURL, url.OriginalURL)
 		if err != nil {
 			return nil, err
 		}
@@ -76,12 +76,33 @@ func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl stri
 		return err
 	}
 
-	url := model.URL{
-		ShortUrl:    shortUrl,
-		OriginalUrl: originalUrl,
+	url := model.URLFile{
+		ShortURL:    shortUrl,
+		OriginalURL: originalUrl,
 	}
 
 	err = s.encoder.Encode(&url)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
+	err := s.Storage.SaveURLBatch(ctx, urls)
+	if err != nil {
+		return err
+	}
+
+	for _, url := range urls {
+		u := model.URLFile{
+			ShortURL:    url.ShortURL,
+			OriginalURL: url.OriginalURL,
+		}
+		err = s.encoder.Encode(&u)
+	}
 
 	if err != nil {
 		return err

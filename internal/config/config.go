@@ -11,29 +11,16 @@ var (
 	ErrConfigFileNotFound = errors.New("config file not found")
 )
 
-func ParseConfigPath() string {
-	var configPath string
-
-	flags := flag.NewFlagSet("config", flag.ContinueOnError)
-	flags.StringVar(&configPath, "c", "./config/conf.yaml", "path to config file")
-	flags.Parse(os.Args[1:])
-
-	envConfigPath := os.Getenv("CONFIG_FILE")
-	if envConfigPath != "" {
-		configPath = envConfigPath
-	}
-
-	return configPath
-}
-
 type Config struct {
+	ConfigPath      string
 	ServerAddress   string `yaml:"server_address" env:"SERVER_ADDRESS" env-default:":8080"`
 	BaseUrl         string `yaml:"base_url" env:"BASE_URL" env-default:"http://localhost:8080"`
 	FileStoragePath string `yaml:"file_storage_path" env:"FILE_STORAGE_PATH"`
 	DatabaseDsn     string `yaml:"database_dsn" env:"DATABASE_DSN"`
 }
 
-func ParseConfig(path string) (*Config, error) {
+// TODO: переписать логику обработки конфига
+func ParseConfig() (*Config, error) {
 	var conf Config
 
 	err := flagParse(&conf)
@@ -41,7 +28,12 @@ func ParseConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	envConfPath := os.Getenv("CONFIG_FILE")
+	if envConfPath != "" {
+		conf.ConfigPath = envConfPath
+	}
+
+	if _, err := os.Stat(conf.ConfigPath); os.IsNotExist(err) {
 		err = cleanenv.ReadEnv(&conf)
 		if err != nil {
 			return nil, err
@@ -49,7 +41,7 @@ func ParseConfig(path string) (*Config, error) {
 		return &conf, ErrConfigFileNotFound
 	}
 
-	err = cleanenv.ReadConfig(path, &conf)
+	err = cleanenv.ReadConfig(conf.ConfigPath, &conf)
 	if err != nil {
 		return nil, err
 	}
@@ -59,11 +51,11 @@ func ParseConfig(path string) (*Config, error) {
 
 func flagParse(conf *Config) error {
 
+	flag.StringVar(&conf.ConfigPath, "c", "./config/conf.yaml", "path to config file")
 	flag.StringVar(&conf.ServerAddress, "a", "", "server address")
 	flag.StringVar(&conf.BaseUrl, "b", "", "base url")
 	flag.StringVar(&conf.FileStoragePath, "f", "", "file storage path")
 	flag.StringVar(&conf.DatabaseDsn, "d", "", "database dsn")
-	flag.String("c", "", "path to config file")
 
 	flag.Parse()
 	return nil

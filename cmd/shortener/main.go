@@ -27,6 +27,8 @@ const (
 	shortUrlLen     = 10
 	shortUrlGenSeed = 42
 
+	batchSize = 10
+
 	serverReadTimeout  = 5 * time.Second
 	serverWriteTimeout = 5 * time.Second
 	serverIdleTimeout  = 30 * time.Second
@@ -50,9 +52,7 @@ func main() {
 	defer logger.Sync()
 
 	// parse config
-	confPath := config.ParseConfigPath()
-
-	conf, err := config.ParseConfig(confPath)
+	conf, err := config.ParseConfig()
 	if err != nil {
 		if !errors.Is(err, config.ErrConfigFileNotFound) {
 			logger.Fatal("failed to parse config", zap.Error(err))
@@ -61,7 +61,7 @@ func main() {
 		logger.Info("no config file found")
 	}
 	logger.Info("Service config",
-		zap.String("config_path", confPath),
+		zap.String("config_path", conf.ConfigPath),
 		zap.String("server_address", conf.ServerAddress),
 		zap.String("base_url", conf.BaseUrl),
 		zap.String("file_storage_path", conf.FileStoragePath),
@@ -90,7 +90,7 @@ func main() {
 	)
 
 	// init service
-	svc := service.NewShortener(logger, conf.BaseUrl, repo, generator)
+	svc := service.NewShortener(logger, conf.BaseUrl, batchSize, repo, generator)
 
 	// init handler
 	h := chihttp.NewHandler(logger, svc, handlerMaxBodyLength)

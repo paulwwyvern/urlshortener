@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
 )
@@ -57,8 +60,49 @@ func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl stri
 
 	_, err = stmt.ExecContext(ctx, shortUrl, originalUrl)
 	if err != nil {
+		var pgxErr *pgconn.PgError
+		if errors.As(err, &pgxErr) {
+			if pgxErr.Code == pgerrcode.UniqueViolation {
+				return errs.ErrShortUrlAlreadyExists
+			}
+		}
 		return errs.ErrInternalError
 	}
+	return nil
+}
+
+func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return errs.ErrInternalError
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO url (short_url, url) VALUES ($1, $2)`)
+	if err != nil {
+		return errs.ErrInternalError
+	}
+	defer stmt.Close()
+
+	for _, url := range urls {
+		_, err = stmt.ExecContext(ctx, url.ShortURL, url.OriginalURL)
+		if err != nil {
+
+			var pgxErr *pgconn.PgError
+			if errors.As(err, &pgxErr) {
+				if pgxErr.Code == pgerrcode.UniqueViolation {
+					return errs.ErrShortUrlAlreadyExists
+				}
+			}
+			return errs.ErrInternalError
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+
+		return errs.ErrInternalError
+	}
+
 	return nil
 }
 

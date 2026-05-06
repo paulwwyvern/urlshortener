@@ -2,6 +2,7 @@ package inmemory
 
 import (
 	"context"
+	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
 	"sync"
@@ -39,6 +40,24 @@ func (s *Storage) SaveURL(_ context.Context, shortUrl string, url string) error 
 		return errs.ErrShortUrlAlreadyExists
 	}
 	s.storage[shortUrl] = url
+	return nil
+}
+
+func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, url := range urls {
+		_, ok := s.storage[url.ShortURL]
+		if ok {
+			return errs.ErrShortUrlAlreadyExists
+		}
+	}
+
+	for _, url := range urls {
+		s.storage[url.ShortURL] = url.OriginalURL
+	}
+
 	return nil
 }
 
