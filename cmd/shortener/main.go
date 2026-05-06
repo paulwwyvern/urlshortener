@@ -2,17 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
-	mwcontext "github.com/paulwwyvern/urlshortener/internal/handler/middleware/context"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
+	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
+	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
 	"github.com/paulwwyvern/urlshortener/internal/service"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -47,18 +50,33 @@ func main() {
 	defer logger.Sync()
 
 	// parse config
-	conf, err := config.ParseConfig()
-	if err != nil {
-		logger.Fatal("failed to parse config", zap.Error(err))
-	}
+	confPath := config.ParseConfigPath()
 
+	conf, err := config.ParseConfig(confPath)
+	if err != nil {
+		if !errors.Is(err, config.ErrConfigFileNotFound) {
+			logger.Fatal("failed to parse config", zap.Error(err))
+			os.Exit(1)
+		}
+		logger.Info("no config file found")
+	}
 	logger.Info("Service config",
+		zap.String("config_path", confPath),
 		zap.String("server_address", conf.ServerAddress),
-		zap.String("base_url: %s", conf.BaseUrl),
+		zap.String("base_url", conf.BaseUrl),
+		zap.String("file_storage_path", conf.FileStoragePath),
+		zap.String("database_dsn", conf.DatabaseDsn),
 	)
 
 	// init repo
-	repo, err := file.NewStorage(conf.FileStoragePath, logger)
+	var repo service.UrlRepository
+	if conf.DatabaseDsn != "" {
+		repo, err = postgres.NewStorage(logger, conf.DatabaseDsn)
+	} else if conf.FileStoragePath != "" {
+		repo, err = file.NewStorage(logger, conf.FileStoragePath)
+	} else {
+		repo, err = inmemory.NewStorage(logger)
+	}
 	if err != nil {
 		logger.Fatal("failed to init storage", zap.Error(err))
 	}
@@ -78,7 +96,6 @@ func main() {
 	h := chihttp.NewHandler(logger, svc, handlerMaxBodyLength)
 
 	r := chi.NewRouter()
-	r.Use(mwcontext.WithContext(ctx))
 	r.Use(mwlogger.WithLogger(logger))
 	r.Use(mwcompress.WithCompress())
 
@@ -88,6 +105,7 @@ func main() {
 	server := &http.Server{
 		Addr:         conf.ServerAddress,
 		Handler:      r,
+		BaseContext:  func(_ net.Listener) context.Context { return ctx },
 		ReadTimeout:  serverReadTimeout,
 		WriteTimeout: serverWriteTimeout,
 		IdleTimeout:  serverIdleTimeout,

@@ -15,6 +15,7 @@ import (
 type ShortenerService interface {
 	GenerateURL(ctx context.Context, url string) (string, error)
 	GetURL(ctx context.Context, shortURL string) (string, error)
+	Ping(ctx context.Context) error
 }
 
 type Handler struct {
@@ -32,6 +33,7 @@ func NewHandler(logger *zap.Logger, service ShortenerService, maxBodyLength int6
 }
 
 func (h *Handler) RegisterRoutes(r *chi.Mux) {
+	r.Get("/ping", h.Ping)
 	r.Get("/{url}", h.GetURL)
 	r.Post("/", h.GenerateURL)
 	r.Post("/api/shorten", h.GenerateURLJson)
@@ -75,7 +77,6 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	shortURL := chi.URLParam(r, "url")
 
 	url, err := h.service.GetURL(ctx, shortURL)
-
 	if err != nil {
 		if errors.Is(err, errs.ErrShortUrlNotFound) {
 			w.WriteHeader(http.StatusNotFound)
@@ -91,7 +92,7 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	//ctx := r.Context()
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
 	if err != nil {
@@ -112,7 +113,7 @@ func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url, err := h.service.GenerateURL(ctx, req.URL)
+	url, err := h.service.GenerateURL(context.Background(), req.URL)
 	if err != nil {
 		if errors.Is(err, errs.ErrInternalError) {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -136,4 +137,16 @@ func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	err := h.service.Ping(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

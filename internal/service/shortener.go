@@ -12,6 +12,8 @@ import (
 type UrlRepository interface {
 	GetURL(context.Context, string) (string, error)
 	SaveURL(ctx context.Context, shortUrl string, url string) error
+	Ping(context.Context) error
+	Close() error
 }
 
 // Генератор коротких ссылок
@@ -68,4 +70,8 @@ func (s *ShortenerService) GetURL(ctx context.Context, shortUrl string) (string,
 		return "", err
 	}
 	return url, nil
+}
+
+func (s *ShortenerService) Ping(ctx context.Context) error {
+	return s.urlRepo.Ping(ctx)
 }

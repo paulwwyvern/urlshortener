@@ -18,7 +18,7 @@ type Storage struct {
 	encoder *json.Encoder
 }
 
-func NewStorage(file string, logger *zap.Logger) (*Storage, error) {
+func NewStorage(logger *zap.Logger, file string) (*Storage, error) {
 	logger.Info("Initializing in-memory storage with file saving")
 
 	storage, err := readStorage(file)
@@ -47,7 +47,7 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 	decoder := json.NewDecoder(f)
 
-	storage := inmemory.NewStorage(zap.NewNop())
+	storage, _ := inmemory.NewStorage(zap.NewNop())
 
 	url := model.URL{}
 

@@ -23,3 +23,5 @@ vendor/
 .vscode
 /bin/
 /db.txt
+/docker/
+/config/
