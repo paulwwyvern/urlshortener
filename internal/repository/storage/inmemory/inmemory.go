@@ -40,7 +40,7 @@ func (s *Storage) GetShortURL(_ context.Context, url string) (string, error) {
 
 	shortUrl, ok := s.shortUrlStorage[url]
 	if !ok {
-		return "", errs.ErrOriginalUrlAlreadyExists
+		return "", errs.ErrOriginalUrlNotFound
 	}
 
 	return shortUrl, nil

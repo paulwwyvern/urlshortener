@@ -1,7 +1,10 @@
 package chihttp
 
 import (
+	"encoding/json"
+	"errors"
 	"github.com/go-chi/chi/v5"
+	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -11,6 +14,8 @@ import (
 	"strings"
 	"testing"
 )
+
+//go:generate mockgen -source=handler.go -destination=mock_handler.go -package=chihttp
 
 func TestHandler_GenerateURL(t *testing.T) {
 	type want struct {
@@ -40,10 +45,20 @@ func TestHandler_GenerateURL(t *testing.T) {
 			url:  "/",
 			body: "http://example.com",
 			want: want{
-				code:     400,
+				code:     500,
 				response: ``,
 			},
-			wantErr: errs.ErrInternalError,
+			wantErr: errors.New("Internal error"),
+		},
+		{
+			name: "Test #3 Conflict",
+			url:  "/",
+			body: "http://example.com",
+			want: want{
+				code:     409,
+				response: `http://localhost:8080`,
+			},
+			wantErr: errs.ErrOriginalUrlAlreadyExists,
 		},
 	}
 
@@ -99,10 +114,18 @@ func TestHandler_GetURL(t *testing.T) {
 			name: "Test #2 Not found",
 			url:  "/Scuf38812",
 			want: want{
-				code:     400,
+				code:     404,
 				location: ``,
 			},
 			wantErr: errs.ErrShortUrlNotFound,
+		}, {
+			name: "Test #3 Internal error",
+			url:  "/Scuf38812",
+			want: want{
+				code:     500,
+				location: ``,
+			},
+			wantErr: errors.New("Internal error"),
 		},
 	}
 
@@ -141,12 +164,13 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		url     string
-		body    string
-		request string
-		want    want
-		wantErr error
+		name            string
+		url             string
+		body            string
+		request         string
+		want            want
+		wantErr         error
+		wantServiceCall bool
 	}{
 		{
 			name:    "Test #1 Success",
@@ -159,7 +183,8 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 				response:    `http://localhost:8080/`,
 				contentType: `application/json`,
 			},
-			wantErr: nil,
+			wantErr:         nil,
+			wantServiceCall: true,
 		},
 		{
 			name:    "Test #2 Internal error",
@@ -167,9 +192,35 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 			body:    `{"url":"http://example.com"}`,
 			request: "http://example.com",
 			want: want{
+				code: 500,
+			},
+			wantErr:         errors.New("Internal error"),
+			wantServiceCall: true,
+		},
+		{
+			name:    "Test #3 Bad request",
+			url:     "/api/shorten",
+			body:    `{"url":"http://exa`,
+			request: "http://example.com",
+			want: want{
 				code: 400,
 			},
-			wantErr: errs.ErrInternalError,
+			wantErr:         nil,
+			wantServiceCall: false,
+		},
+		{
+			name:    "Test #4 Conflict",
+			url:     "/api/shorten",
+			body:    `{"url":"http://example.com"}`,
+			request: "http://example.com",
+			want: want{
+				code:        409,
+				body:        "{\"result\":\"http://localhost:8080/\"}\n",
+				response:    `http://localhost:8080/`,
+				contentType: `application/json`,
+			},
+			wantErr:         errs.ErrOriginalUrlAlreadyExists,
+			wantServiceCall: true,
 		},
 	}
 
@@ -179,9 +230,9 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := NewMockShortenerService(ctrl)
-
-			svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, tt.wantErr)
-
+			if tt.wantServiceCall {
+				svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, tt.wantErr)
+			}
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
 			h.RegisterRoutes(mux)
@@ -194,6 +245,100 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 
 			assert.Equal(t, tt.want.code, w.Code)
 			assert.Equal(t, tt.want.body, w.Body.String())
+			assert.Equal(t, tt.want.contentType, w.Header().Get("Content-Type"))
+
+		})
+	}
+}
+
+func TestHandler_GenerateUrlBatch(t *testing.T) {
+	type want struct {
+		code        int
+		body        string
+		contentType string
+	}
+
+	tests := []struct {
+		name            string
+		url             string
+		body            string
+		want            want
+		wantErr         error
+		wantServiceCall bool
+	}{
+		{
+			name: "Test #1 Success",
+			url:  "/api/shorten/batch",
+			body: `[{"correlation_id": "a", "original_url": "https://yandex.ru"},
+ 			        {"correlation_id": "b", "original_url": "https://google.com"},
+				    {"correlation_id": "c", "original_url": "https://example.com"}]`,
+			want: want{
+				code: 201,
+				body: `[{"correlation_id": "a", "short_url": "http://localhost:8080/gIb8VTucox"},
+                        {"correlation_id": "b", "short_url": "http://localhost:8080/et6TAyR6xm"},
+                        {"correlation_id": "c", "short_url": "http://localhost:8080/pvPgKzcNdC"}]`,
+				contentType: `application/json`,
+			},
+			wantErr:         nil,
+			wantServiceCall: true,
+		},
+		{
+			name: "Test #2 Internal Error",
+			url:  "/api/shorten/batch",
+			body: `[{"correlation_id": "a", "original_url": "https://yandex.ru"},
+ 			        {"correlation_id": "b", "original_url": "https://google.com"},
+				    {"correlation_id": "c", "original_url": "https://example.com"}]`,
+			want: want{
+				code: 500,
+			},
+			wantErr:         errors.New("Internal error"),
+			wantServiceCall: true,
+		},
+		{
+			name: "Test #3 Bad request",
+			url:  "/api/shorten/batch",
+			body: `[{"correlation_id": "a", "original_url": "https://yandex.ru"},
+ 			        {"correlation_id": "b", "original_ur`,
+			want: want{
+				code: 400,
+			},
+			wantErr:         errors.New("Internal error"),
+			wantServiceCall: false,
+		},
+	}
+
+	logger := zap.NewNop()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			svc := NewMockShortenerService(ctrl)
+
+			if tt.wantServiceCall {
+				svcRequest := []model.GenerateURLBatchRequest{}
+				json.Unmarshal([]byte(tt.body), &svcRequest)
+
+				svcResponse := []model.GenerateURLBatchResponse{}
+				json.Unmarshal([]byte(tt.want.body), &svcResponse)
+
+				svc.EXPECT().GenerateURLBatch(gomock.Any(), svcRequest).Return(svcResponse, tt.wantErr)
+			}
+			h := NewHandler(logger, svc, 1024)
+			mux := chi.NewRouter()
+			h.RegisterRoutes(mux)
+
+			r := httptest.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.body))
+
+			w := httptest.NewRecorder()
+
+			mux.ServeHTTP(w, r)
+
+			assert.Equal(t, tt.want.code, w.Code)
+			if tt.want.body != "" {
+				assert.JSONEq(t, tt.want.body, w.Body.String())
+			} else {
+				assert.Empty(t, w.Body.String())
+			}
 			assert.Equal(t, tt.want.contentType, w.Header().Get("Content-Type"))
 
 		})

@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	model "github.com/paulwwyvern/urlshortener/internal/model"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -55,6 +56,21 @@ func (mr *MockShortenerServiceMockRecorder) GenerateURL(ctx, url any) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateURL", reflect.TypeOf((*MockShortenerService)(nil).GenerateURL), ctx, url)
 }
 
+// GenerateURLBatch mocks base method.
+func (m *MockShortenerService) GenerateURLBatch(ctx context.Context, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GenerateURLBatch", ctx, urls)
+	ret0, _ := ret[0].([]model.GenerateURLBatchResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GenerateURLBatch indicates an expected call of GenerateURLBatch.
+func (mr *MockShortenerServiceMockRecorder) GenerateURLBatch(ctx, urls any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateURLBatch", reflect.TypeOf((*MockShortenerService)(nil).GenerateURLBatch), ctx, urls)
+}
+
 // GetURL mocks base method.
 func (m *MockShortenerService) GetURL(ctx context.Context, shortURL string) (string, error) {
 	m.ctrl.T.Helper()
@@ -68,4 +84,18 @@ func (m *MockShortenerService) GetURL(ctx context.Context, shortURL string) (str
 func (mr *MockShortenerServiceMockRecorder) GetURL(ctx, shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetURL", reflect.TypeOf((*MockShortenerService)(nil).GetURL), ctx, shortURL)
+}
+
+// Ping mocks base method.
+func (m *MockShortenerService) Ping(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ping", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Ping indicates an expected call of Ping.
+func (mr *MockShortenerServiceMockRecorder) Ping(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockShortenerService)(nil).Ping), ctx)
 }

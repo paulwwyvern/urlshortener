@@ -25,3 +25,5 @@ vendor/
 /db.txt
 /docker/
 /config/
+/check_coverage.sh
+/migrate.sh

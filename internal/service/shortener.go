@@ -104,9 +104,10 @@ func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.Ge
 				OriginalURL: url.OriginalURL,
 			})
 		}
-		// если нашлась коллизия в базе
+		// Сам батч меняется, если какие то урлы уже есть в базе
 		err := s.urlRepo.SaveURLBatch(ctx, batch)
 
+		// если нашлась коллизия в базе
 		if err != nil {
 			if errors.Is(err, errs.ErrShortUrlAlreadyExists) {
 				// коллизия из за сгенеренных урлов, генерим батч заново

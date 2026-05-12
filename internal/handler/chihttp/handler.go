@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/go-chi/chi/v5"
+	"github.com/paulwwyvern/urlshortener/internal/handler/httperr"
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
@@ -39,10 +40,13 @@ func (h *Handler) RegisterRoutes(r *chi.Mux) {
 	r.Post("/", h.GenerateURL)
 	r.Post("/api/shorten", h.GenerateURLJson)
 	r.Post("/api/shorten/batch", h.GenerateURLJsonBatch)
-
 }
 
 func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.generateURL)(w, r)
+}
+
+func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
@@ -54,7 +58,7 @@ func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		return
+		return err
 	}
 
 	shortURL, err := h.service.GenerateURL(ctx, string(body))
@@ -64,21 +68,22 @@ func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
 			w.WriteHeader(http.StatusConflict)
 		} else {
-			if errors.Is(err, errs.ErrInternalError) {
-				w.WriteHeader(http.StatusInternalServerError)
-			} else {
-				w.WriteHeader(http.StatusBadRequest)
-			}
-			return
+			w.WriteHeader(http.StatusInternalServerError)
+			return err
 		}
 	} else {
 		w.WriteHeader(http.StatusCreated)
 	}
 
 	w.Write([]byte(shortURL))
+	return nil
 }
 
 func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.getURL)(w, r)
+}
+
+func (h *Handler) getURL(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
 	shortURL := chi.URLParam(r, "url")
@@ -87,18 +92,23 @@ func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, errs.ErrShortUrlNotFound) {
 			w.WriteHeader(http.StatusNotFound)
-		} else if errors.Is(err, errs.ErrInternalError) {
-			w.WriteHeader(http.StatusInternalServerError)
 		} else {
-			w.WriteHeader(http.StatusBadRequest)
+			w.WriteHeader(http.StatusInternalServerError)
+			return err
 		}
-		return
+		return nil
 	}
 
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	return nil
+
 }
 
 func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.generateURLJson)(w, r)
+}
+
+func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
@@ -110,31 +120,28 @@ func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		return
+		return err
 	}
 
 	req := model.GenerateURLJsonRequest{}
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		return err
 	}
 
 	url, err := h.service.GenerateURL(ctx, req.URL)
 
-	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
 		} else {
-			if errors.Is(err, errs.ErrInternalError) {
-				w.WriteHeader(http.StatusInternalServerError)
-			} else {
-				w.WriteHeader(http.StatusBadRequest)
-			}
-			return
+			w.WriteHeader(http.StatusInternalServerError)
+			return err
 		}
 	} else {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 	}
 
@@ -143,14 +150,19 @@ func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = json.NewEncoder(w).Encode(res)
-
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (h *Handler) GenerateURLJsonBatch(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.generateURLJsonBatch)(w, r)
+}
+
+func (h *Handler) generateURLJsonBatch(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
@@ -162,45 +174,47 @@ func (h *Handler) GenerateURLJsonBatch(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
-		return
+		return err
 	}
 
 	req := []model.GenerateURLBatchRequest{}
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return
+		return err
 	}
 
 	res, err := h.service.GenerateURLBatch(ctx, req)
 	if err != nil {
-		if errors.Is(err, errs.ErrInternalError) {
-			w.WriteHeader(http.StatusInternalServerError)
-		} else {
-			w.WriteHeader(http.StatusBadRequest)
-		}
-		return
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 
 	err = json.NewEncoder(w).Encode(res)
-
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return err
 	}
+
+	return nil
 }
 
 func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.ping)(w, r)
+}
+
+func (h *Handler) ping(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
 	err := h.service.Ping(ctx)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	w.WriteHeader(http.StatusOK)
+	return nil
 }

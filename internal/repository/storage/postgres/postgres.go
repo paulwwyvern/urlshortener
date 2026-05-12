@@ -5,6 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -20,7 +24,16 @@ type Storage struct {
 	tx map[int64]*sql.Tx
 }
 
-func NewStorage(logger *zap.Logger, dsn string) (*Storage, error) {
+func NewStorage(logger *zap.Logger, dsn string, migrate bool, migrationSource string) (*Storage, error) {
+	if migrate {
+		logger.Info("Initializing migration")
+		err := Migrate(migrationSource, dsn)
+		if err != nil {
+			return nil, err
+		}
+		logger.Info("Migration complete")
+	}
+
 	logger.Info("Initializing postgres storage")
 
 	db, err := sql.Open("pgx", dsn)
@@ -37,10 +50,22 @@ func NewStorage(logger *zap.Logger, dsn string) (*Storage, error) {
 	return &Storage{db: db, tx: make(map[int64]*sql.Tx)}, nil
 }
 
+func Migrate(source string, dsn string) error {
+	m, err := migrate.New("file://"+source, dsn)
+	if err != nil {
+		return err
+	}
+	err = m.Up()
+	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return err
+	}
+	return nil
+}
+
 func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
 	stmt, err := s.db.PrepareContext(ctx, `SELECT url FROM url WHERE short_url = $1`)
 	if err != nil {
-		return "", errs.ErrInternalError
+		return "", fmt.Errorf("GetURL: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
@@ -50,7 +75,7 @@ func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", errs.ErrShortUrlNotFound
 		} else {
-			return "", errs.ErrInternalError
+			return "", fmt.Errorf("GetURL: failed to get url: %w", err)
 		}
 	}
 	return url, nil
@@ -59,7 +84,7 @@ func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
 func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url FROM url WHERE url = $1`)
 	if err != nil {
-		return "", errs.ErrInternalError
+		return "", fmt.Errorf("GetShortURL: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
@@ -69,7 +94,7 @@ func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", errs.ErrShortUrlNotFound
 		} else {
-			return "", errs.ErrInternalError
+			return "", fmt.Errorf("GetShortURL: failed to get url: %w", err)
 		}
 	}
 	return shortUrl, nil
@@ -78,7 +103,7 @@ func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl string) error {
 	stmt, err := s.db.PrepareContext(ctx, `INSERT INTO url (short_url, url) VALUES ($1, $2)`)
 	if err != nil {
-		return errs.ErrInternalError
+		return fmt.Errorf("SaveURL: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
@@ -96,7 +121,7 @@ func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl stri
 				}
 			}
 		}
-		return errs.ErrInternalError
+		return fmt.Errorf("SaveURL: failed to save url: %w", err)
 	}
 	return nil
 }
@@ -105,7 +130,7 @@ func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return errs.ErrInternalError
+		return fmt.Errorf("SaveURLBatch: failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
@@ -114,7 +139,7 @@ func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
 			ON CONFLICT ON CONSTRAINT url_unique DO UPDATE SET url = EXCLUDED.url 
 			RETURNING short_url, (xmax != 0)`)
 	if err != nil {
-		return errs.ErrInternalError
+		return fmt.Errorf("SaveURLBatch: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
@@ -123,7 +148,6 @@ func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
 		var shortUrl string
 		var isExist bool
 		err = stmt.QueryRowContext(ctx, url.ShortURL, url.OriginalURL).Scan(&shortUrl, &isExist)
-		fmt.Println(err)
 
 		if err != nil {
 			var pgxErr *pgconn.PgError
@@ -135,7 +159,7 @@ func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
 					}
 				}
 			}
-			return errs.ErrInternalError
+			return fmt.Errorf("SaveURLBatch: failed to save url: %w", err)
 		}
 
 		if isExist {
@@ -147,8 +171,7 @@ func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
 	}
 	err = tx.Commit()
 	if err != nil {
-
-		return errs.ErrInternalError
+		return fmt.Errorf("SaveURLBatch: failed to commit transaction: %w", err)
 	}
 
 	return nil
@@ -159,5 +182,11 @@ func (s *Storage) Close() error {
 }
 
 func (s *Storage) Ping(ctx context.Context) error {
-	return s.db.PingContext(ctx)
+	err := s.db.PingContext(ctx)
+
+	if err != nil {
+		return fmt.Errorf("Ping: failed to ping db: %w ", err)
+	}
+
+	return nil
 }

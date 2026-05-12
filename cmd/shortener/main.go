@@ -36,6 +36,8 @@ const (
 	handlerMaxBodyLength = 1024 * 1024
 
 	shutdownTimeout = 5 * time.Second
+
+	migrationSource = "./migrations"
 )
 
 func main() {
@@ -71,7 +73,7 @@ func main() {
 	// init repo
 	var repo service.UrlRepository
 	if conf.DatabaseDsn != "" {
-		repo, err = postgres.NewStorage(logger, conf.DatabaseDsn)
+		repo, err = postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
 	} else if conf.FileStoragePath != "" {
 		repo, err = file.NewStorage(logger, conf.FileStoragePath)
 	} else {
