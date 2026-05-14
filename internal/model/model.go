@@ -1,15 +1,32 @@
 package model
 
-type GenerateUrlJsonRequest struct {
-	Url string `json:"url"`
+type URL struct {
+	ID          string `json:",omitempty"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+	IsExist     bool   `json:"-"`
 }
 
-type GenerateUrlJsonResponse struct {
+type GenerateURLBatchRequest struct {
+	ID          string `json:"correlation_id"`
+	OriginalURL string `json:"original_url"`
+}
+
+type GenerateURLBatchResponse struct {
+	ID       string `json:"correlation_id"`
+	ShortURL string `json:"short_url"`
+}
+
+type GenerateURLJsonRequest struct {
+	URL string `json:"url"`
+}
+
+type GenerateURLJsonResponse struct {
 	Result string `json:"result"`
 }
 
-type Url struct {
-	Id          string `json:"id,omitempty"`
-	ShortUrl    string `json:"short_url"`
-	OriginalUrl string `json:"original_url"`
+type URLFile struct {
+	ID          string `json:"id,omitempty"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }

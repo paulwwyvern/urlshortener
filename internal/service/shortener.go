@@ -1,16 +1,22 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
 )
 
 // Репа где хранятся ссылки
 type UrlRepository interface {
-	GetURL(string) (string, error)
-	SaveURL(shortUrl string, url string) error
+	GetURL(ctx context.Context, shortUrl string) (string, error)
+	GetShortURL(ctx context.Context, url string) (string, error)
+	SaveURL(ctx context.Context, shortUrl string, url string) error
+	SaveURLBatch(ctx context.Context, urls []model.URL) error
+	Ping(context.Context) error
+	Close() error
 }
 
 // Генератор коротких ссылок
@@ -21,50 +27,131 @@ type UrlGenerator interface {
 type ShortenerService struct {
 	logger *zap.Logger
 
-	baseUrl string
+	baseUrl   string
+	batchSize int
 
 	urlRepo UrlRepository
 	urlGen  UrlGenerator
 }
 
-func NewShortener(logger *zap.Logger, baseUrl string, urlRepo UrlRepository, urlGen UrlGenerator) *ShortenerService {
+func NewShortener(logger *zap.Logger, baseUrl string, batchSize int, urlRepo UrlRepository, urlGen UrlGenerator) *ShortenerService {
 	logger.Info("Creating shortener service")
 
 	return &ShortenerService{
 		logger: logger,
 
-		baseUrl: baseUrl,
+		baseUrl:   baseUrl,
+		batchSize: batchSize,
 
 		urlRepo: urlRepo,
 		urlGen:  urlGen,
 	}
 }
 
-func (s *ShortenerService) GenerateURL(url string) (string, error) {
+func (s *ShortenerService) GenerateURL(ctx context.Context, url string) (string, error) {
+
 	shortUrl := s.urlGen.Generate()
 
-	err := s.urlRepo.SaveURL(shortUrl, url)
+	err := s.urlRepo.SaveURL(ctx, shortUrl, url)
 
+	var attempts int
 	for err != nil {
+		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
+			shortUrl, err := s.urlRepo.GetShortURL(ctx, url)
+			if err != nil {
+				return "", err
+			}
+
+			return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), errs.ErrOriginalUrlAlreadyExists
+
+		}
 		if !errors.Is(err, errs.ErrShortUrlAlreadyExists) {
 			return "", err
 		}
 		shortUrl = s.urlGen.Generate()
-		err = s.urlRepo.SaveURL(shortUrl, url)
+		err = s.urlRepo.SaveURL(ctx, shortUrl, url)
+		attempts++
 	}
 
 	s.logger.Info("New url generated",
 		zap.String("url", url),
 		zap.String("shortUrl", shortUrl),
+		zap.Int("attempts", attempts),
 	)
-
 	return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), nil
 }
 
-func (s *ShortenerService) GetURL(shortUrl string) (string, error) {
-	url, err := s.urlRepo.GetURL(shortUrl)
-	if err != nil {
-		return "", err
+func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error) {
+	batch := make([]model.URL, 0, s.batchSize)
+	shortUrls := make([]model.GenerateURLBatchResponse, 0, len(urls))
+
+	var attempts int
+	var offset int
+	// делим запрос на батчи фикс размера
+	for ; offset < len(urls); offset += s.batchSize {
+		attempts++
+
+		urlsBatch := urls[offset : offset+min(s.batchSize, len(urls)-offset)]
+
+		// генерим шорты
+		for _, url := range urlsBatch {
+			var shortUrl string
+			shortUrl = s.urlGen.Generate()
+
+			batch = append(batch, model.URL{
+				ID:          url.ID,
+				ShortURL:    shortUrl,
+				OriginalURL: url.OriginalURL,
+			})
+		}
+		// Сам батч меняется, если какие то урлы уже есть в базе
+		err := s.urlRepo.SaveURLBatch(ctx, batch)
+
+		// если нашлась коллизия в базе
+		if err != nil {
+			if errors.Is(err, errs.ErrShortUrlAlreadyExists) {
+				// коллизия из за сгенеренных урлов, генерим батч заново
+				offset -= s.batchSize
+				batch = batch[:0]
+				continue
+			} else {
+				return nil, err
+			}
+		}
+
+		for _, url := range batch {
+
+			if !url.IsExist {
+				s.logger.Info("New url generated",
+					zap.String("url", url.OriginalURL),
+					zap.String("shortUrl", url.ShortURL),
+					zap.Int("attempts", attempts),
+				)
+			} else {
+				s.logger.Info("Trying generated existing url",
+					zap.String("url", url.OriginalURL),
+					zap.String("shortUrl", url.ShortURL),
+				)
+			}
+
+			shortUrls = append(shortUrls, model.GenerateURLBatchResponse{
+				ID:       url.ID,
+				ShortURL: fmt.Sprintf("%s/%s", s.baseUrl, url.ShortURL),
+			})
+		}
+
+		attempts = 0
+		batch = batch[:0]
 	}
-	return url, nil
+
+	return shortUrls, nil
+
+}
+
+func (s *ShortenerService) GetURL(ctx context.Context, shortUrl string) (string, error) {
+	return s.urlRepo.GetURL(ctx, shortUrl)
+}
+
+func (s *ShortenerService) Ping(ctx context.Context) error {
+	return s.urlRepo.Ping(ctx)
 }

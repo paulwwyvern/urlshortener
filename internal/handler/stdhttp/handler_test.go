@@ -1,6 +1,7 @@
 package stdhttp
 
 import (
+	"errors"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -41,7 +42,7 @@ func TestHandler_GenerateURL(t *testing.T) {
 				code:     400,
 				response: ``,
 			},
-			wantErr: errs.ErrInternalError,
+			wantErr: errors.New("internal error"),
 		},
 	}
 

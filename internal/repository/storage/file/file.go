@@ -1,7 +1,9 @@
 package file
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"go.uber.org/zap"
@@ -16,7 +18,7 @@ type Storage struct {
 	encoder *json.Encoder
 }
 
-func NewStorage(file string, logger *zap.Logger) (*Storage, error) {
+func NewStorage(logger *zap.Logger, file string) (*Storage, error) {
 	logger.Info("Initializing in-memory storage with file saving")
 
 	storage, err := readStorage(file)
@@ -45,20 +47,20 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 	decoder := json.NewDecoder(f)
 
-	storage := inmemory.NewStorage(zap.NewNop())
+	storage, _ := inmemory.NewStorage(zap.NewNop())
 
-	url := model.Url{}
+	url := model.URLFile{}
 
 	for {
 		err = decoder.Decode(&url)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, err
 		}
 
-		err = storage.SaveURL(url.ShortUrl, url.OriginalUrl)
+		err = storage.SaveURL(context.Background(), url.ShortURL, url.OriginalURL)
 		if err != nil {
 			return nil, err
 		}
@@ -68,21 +70,48 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 }
 
-func (s *Storage) SaveURL(shortUrl string, originalUrl string) error {
-	err := s.Storage.SaveURL(shortUrl, originalUrl)
+func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl string) error {
+	err := s.Storage.SaveURL(ctx, shortUrl, originalUrl)
 	if err != nil {
 		return err
 	}
 
-	url := model.Url{
-		ShortUrl:    shortUrl,
-		OriginalUrl: originalUrl,
+	url := model.URLFile{
+		ShortURL:    shortUrl,
+		OriginalURL: originalUrl,
 	}
 
 	err = s.encoder.Encode(&url)
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
+	err := s.Storage.SaveURLBatch(ctx, urls)
+	if err != nil {
+		return err
+	}
+
+	for _, url := range urls {
+		u := model.URLFile{
+			ShortURL:    url.ShortURL,
+			OriginalURL: url.OriginalURL,
+		}
+
+		if url.IsExist {
+			continue
+		}
+
+		err = s.encoder.Encode(&u)
+
+		if err != nil {
+			return err
+		}
+
 	}
 
 	return nil

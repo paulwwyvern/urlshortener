@@ -1,16 +1,25 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
+	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
+	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
 	"github.com/paulwwyvern/urlshortener/internal/service"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
+	"log"
+	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -18,35 +27,58 @@ const (
 	shortUrlLen     = 10
 	shortUrlGenSeed = 42
 
+	batchSize = 10
+
 	serverReadTimeout  = 5 * time.Second
 	serverWriteTimeout = 5 * time.Second
 	serverIdleTimeout  = 30 * time.Second
 
 	handlerMaxBodyLength = 1024 * 1024
+
+	shutdownTimeout = 5 * time.Second
+
+	migrationSource = "./migrations"
 )
 
 func main() {
 
+	// init context
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	// init logger
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer logger.Sync()
 
 	// parse config
 	conf, err := config.ParseConfig()
 	if err != nil {
-		logger.Fatal("failed to parse config", zap.Error(err))
+		if !errors.Is(err, config.ErrConfigFileNotFound) {
+			logger.Fatal("failed to parse config", zap.Error(err))
+			os.Exit(1)
+		}
+		logger.Info("no config file found")
 	}
-
 	logger.Info("Service config",
+		zap.String("config_path", conf.ConfigPath),
 		zap.String("server_address", conf.ServerAddress),
-		zap.String("base_url: %s", conf.BaseUrl),
+		zap.String("base_url", conf.BaseUrl),
+		zap.String("file_storage_path", conf.FileStoragePath),
+		zap.String("database_dsn", conf.DatabaseDsn),
 	)
 
 	// init repo
-	repo, err := file.NewStorage(conf.FileStoragePath, logger)
+	var repo service.UrlRepository
+	if conf.DatabaseDsn != "" {
+		repo, err = postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
+	} else if conf.FileStoragePath != "" {
+		repo, err = file.NewStorage(logger, conf.FileStoragePath)
+	} else {
+		repo, err = inmemory.NewStorage(logger)
+	}
 	if err != nil {
 		logger.Fatal("failed to init storage", zap.Error(err))
 	}
@@ -59,8 +91,10 @@ func main() {
 		shortUrlGenSeed,
 	)
 
+	logger.Info("Init random generator")
+
 	// init service
-	svc := service.NewShortener(logger, conf.BaseUrl, repo, generator)
+	svc := service.NewShortener(logger, conf.BaseUrl, batchSize, repo, generator)
 
 	// init handler
 	h := chihttp.NewHandler(logger, svc, handlerMaxBodyLength)
@@ -75,12 +109,34 @@ func main() {
 	server := &http.Server{
 		Addr:         conf.ServerAddress,
 		Handler:      r,
+		BaseContext:  func(_ net.Listener) context.Context { return ctx },
 		ReadTimeout:  serverReadTimeout,
 		WriteTimeout: serverWriteTimeout,
 		IdleTimeout:  serverIdleTimeout,
 	}
 
-	if err := server.ListenAndServe(); err != nil {
+	// run server
+	servErr := make(chan error)
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			servErr <- err
+		}
+	}()
+
+	select {
+	case err := <-servErr:
 		logger.Fatal("failed to start server", zap.Error(err))
+		os.Exit(1)
+	case <-ctx.Done():
+		stop()
+		logger.Info("shutdown signal received")
 	}
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer shutdownCancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		logger.Fatal("failed to graceful shutdown server", zap.Error(err))
+	}
+	logger.Info("shutdown complete")
 }
