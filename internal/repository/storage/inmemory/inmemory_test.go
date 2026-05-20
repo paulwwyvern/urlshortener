@@ -170,7 +170,7 @@ func TestStorage_SaveURL(t *testing.T) {
 			s, _ := NewStorage(logger)
 			s.originalUrlStorage = tt.originalUrlStorage
 			s.shortUrlStorage = tt.shortUrlStorage
-			err := s.SaveURL(context.Background(), tt.shortUrl, tt.url)
+			err := s.SaveURL(context.Background(), 1234, tt.shortUrl, tt.url)
 
 			assert.Equal(t, tt.wantOriginalUrl, s.originalUrlStorage)
 			assert.Equal(t, tt.wantShortUrl, s.shortUrlStorage)

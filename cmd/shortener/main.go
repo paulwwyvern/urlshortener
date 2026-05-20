@@ -6,12 +6,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
+	mwauth "github.com/paulwwyvern/urlshortener/internal/handler/middleware/auth"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
-	"github.com/paulwwyvern/urlshortener/internal/service"
+	"github.com/paulwwyvern/urlshortener/internal/repository/userstorage"
+	"github.com/paulwwyvern/urlshortener/internal/service/shortener"
+	"github.com/paulwwyvern/urlshortener/internal/service/user"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
 	"log"
@@ -38,6 +41,8 @@ const (
 	shutdownTimeout = 5 * time.Second
 
 	migrationSource = "./migrations"
+
+	authSignKey = "super sign key"
 )
 
 func main() {
@@ -71,7 +76,7 @@ func main() {
 	)
 
 	// init repo
-	var repo service.UrlRepository
+	var repo shortener.UrlRepository
 	if conf.DatabaseDsn != "" {
 		repo, err = postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
 	} else if conf.FileStoragePath != "" {
@@ -84,6 +89,9 @@ func main() {
 	}
 	defer repo.Close()
 
+	// init user repo
+	userRepo := userstorage.NewStorage()
+
 	// init generator
 	generator := strgenerator.NewGenerator(
 		strgenerator.Digits+strgenerator.UppercaseLatin+strgenerator.LowercaseLatin,
@@ -94,16 +102,33 @@ func main() {
 	logger.Info("Init random generator")
 
 	// init service
-	svc := service.NewShortener(logger, conf.BaseUrl, batchSize, repo, generator)
+	shortenerService := shortener.NewShortener(logger, conf.BaseUrl, batchSize, repo, generator)
+	userService := user.NewService(logger, userRepo)
 
 	// init handler
-	h := chihttp.NewHandler(logger, svc, handlerMaxBodyLength)
+	h := chihttp.NewHandler(logger, shortenerService, handlerMaxBodyLength)
 
 	r := chi.NewRouter()
+
+	// routes
+
 	r.Use(mwlogger.WithLogger(logger))
 	r.Use(mwcompress.WithCompress())
 
-	h.RegisterRoutes(r)
+	r.Get("/{url}", h.GetURL)
+	r.Get("/ping", h.Ping)
+	r.Group(func(r chi.Router) {
+		r.Use(mwauth.WithAuth(authSignKey, userService))
+
+		r.Get("/api/user/urls", h.GetUserURLs)
+	})
+	r.Group(func(r chi.Router) {
+		r.Use(mwauth.WithAuth(authSignKey, userService))
+
+		r.Post("/", h.GenerateURL)
+		r.Post("/api/shorten", h.GenerateURLJson)
+		r.Post("/api/shorten/batch", h.GenerateURLJsonBatch)
+	})
 
 	// init server
 	server := &http.Server{

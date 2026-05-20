@@ -60,7 +60,7 @@ func readStorage(file string) (*inmemory.Storage, error) {
 			return nil, err
 		}
 
-		err = storage.SaveURL(context.Background(), url.ShortURL, url.OriginalURL)
+		err = storage.SaveURL(context.Background(), url.UserID, url.ShortURL, url.OriginalURL)
 		if err != nil {
 			return nil, err
 		}
@@ -70,8 +70,8 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 }
 
-func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl string) error {
-	err := s.Storage.SaveURL(ctx, shortUrl, originalUrl)
+func (s *Storage) SaveURL(ctx context.Context, userID int32, shortUrl string, originalUrl string) error {
+	err := s.Storage.SaveURL(ctx, userID, shortUrl, originalUrl)
 	if err != nil {
 		return err
 	}
@@ -90,8 +90,8 @@ func (s *Storage) SaveURL(ctx context.Context, shortUrl string, originalUrl stri
 	return nil
 }
 
-func (s *Storage) SaveURLBatch(ctx context.Context, urls []model.URL) error {
-	err := s.Storage.SaveURLBatch(ctx, urls)
+func (s *Storage) SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error {
+	err := s.Storage.SaveURLBatch(ctx, userID, urls)
 	if err != nil {
 		return err
 	}

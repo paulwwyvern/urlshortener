@@ -7,6 +7,11 @@ type URL struct {
 	IsExist     bool   `json:"-"`
 }
 
+type GetUserURLResponse struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 type GenerateURLBatchRequest struct {
 	ID          string `json:"correlation_id"`
 	OriginalURL string `json:"original_url"`
@@ -27,6 +32,7 @@ type GenerateURLJsonResponse struct {
 
 type URLFile struct {
 	ID          string `json:"id,omitempty"`
+	UserID      int32  `json:"user_id"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }

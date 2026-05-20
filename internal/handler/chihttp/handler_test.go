@@ -70,11 +70,11 @@ func TestHandler_GenerateURL(t *testing.T) {
 
 			svc := NewMockShortenerService(ctrl)
 
-			svc.EXPECT().GenerateURL(gomock.Any(), tt.body).Return(tt.want.response, tt.wantErr)
+			svc.EXPECT().GenerateURL(gomock.Any(), gomock.Any(), tt.body).Return(tt.want.response, tt.wantErr)
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Post("/", h.GenerateURL)
 
 			r := httptest.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.body))
 
@@ -140,7 +140,7 @@ func TestHandler_GetURL(t *testing.T) {
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Get("/{url}", h.GetURL)
 
 			r := httptest.NewRequest(http.MethodGet, tt.url, nil)
 
@@ -231,11 +231,11 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := NewMockShortenerService(ctrl)
 			if tt.wantServiceCall {
-				svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, tt.wantErr)
+				svc.EXPECT().GenerateURL(gomock.Any(), gomock.Any(), tt.request).Return(tt.want.response, tt.wantErr)
 			}
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Post("/api/shorten", h.GenerateURLJson)
 
 			r := httptest.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.body))
 
@@ -321,11 +321,11 @@ func TestHandler_GenerateUrlBatch(t *testing.T) {
 				svcResponse := []model.GenerateURLBatchResponse{}
 				json.Unmarshal([]byte(tt.want.body), &svcResponse)
 
-				svc.EXPECT().GenerateURLBatch(gomock.Any(), svcRequest).Return(svcResponse, tt.wantErr)
+				svc.EXPECT().GenerateURLBatch(gomock.Any(), gomock.Any(), svcRequest).Return(svcResponse, tt.wantErr)
 			}
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Post("/api/shorten/batch", h.GenerateURLJsonBatch)
 
 			r := httptest.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.body))
 
@@ -341,87 +341,6 @@ func TestHandler_GenerateUrlBatch(t *testing.T) {
 			}
 			assert.Equal(t, tt.want.contentType, w.Header().Get("Content-Type"))
 
-		})
-	}
-}
-
-func TestHandler_Router(t *testing.T) {
-	type want struct {
-		code     int
-		body     string
-		response string
-		location string
-	}
-
-	tests := []struct {
-		name    string
-		method  string
-		url     string
-		body    string
-		request string
-		want    want
-	}{
-		{
-			name:    "Test #1 Post /",
-			method:  http.MethodPost,
-			url:     "/",
-			body:    "http://example.com",
-			request: "http://example.com",
-
-			want: want{
-				code:     201,
-				response: `http://localhost:8080/`,
-				body:     `http://localhost:8080/`,
-			},
-		}, {
-			name:   "Test #2 Get /short",
-			method: http.MethodGet,
-			url:    "/short",
-			want: want{
-				code:     307,
-				body:     "<a href=\"http://example.com\">Temporary Redirect</a>.\n\n",
-				location: "http://example.com",
-			},
-		}, {
-			name:    "Test #3 Get /api/shorten",
-			method:  http.MethodPost,
-			url:     "/api/shorten",
-			body:    `{"url":"http://example.com"}`,
-			request: "http://example.com",
-			want: want{
-				code:     201,
-				body:     "{\"result\":\"http://localhost:8080/\"}\n",
-				response: `http://localhost:8080/`,
-			},
-		},
-	}
-
-	logger := zap.NewNop()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			svc := NewMockShortenerService(ctrl)
-
-			if tt.method == http.MethodGet {
-				svc.EXPECT().GetURL(gomock.Any(), tt.url[1:]).Return(tt.want.location, nil)
-			}
-			if tt.method == http.MethodPost {
-				svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, nil)
-			}
-
-			h := NewHandler(logger, svc, 1024)
-			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
-
-			r := httptest.NewRequest(tt.method, tt.url, strings.NewReader(tt.body))
-			w := httptest.NewRecorder()
-
-			mux.ServeHTTP(w, r)
-
-			assert.Equal(t, tt.want.code, w.Code)
-			assert.Equal(t, tt.want.body, w.Body.String())
-			assert.Equal(t, tt.want.location, w.Header().Get("Location"))
 		})
 	}
 }

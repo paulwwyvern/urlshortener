@@ -1,4 +1,4 @@
-package service
+package shortener
 
 import (
 	"context"
@@ -13,8 +13,9 @@ import (
 type UrlRepository interface {
 	GetURL(ctx context.Context, shortUrl string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
-	SaveURL(ctx context.Context, shortUrl string, url string) error
-	SaveURLBatch(ctx context.Context, urls []model.URL) error
+	GetUserURL(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error)
+	SaveURL(ctx context.Context, userId int32, shortUrl string, url string) error
+	SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error
 	Ping(context.Context) error
 	Close() error
 }
@@ -48,11 +49,11 @@ func NewShortener(logger *zap.Logger, baseUrl string, batchSize int, urlRepo Url
 	}
 }
 
-func (s *ShortenerService) GenerateURL(ctx context.Context, url string) (string, error) {
+func (s *ShortenerService) GenerateURL(ctx context.Context, userID int32, url string) (string, error) {
 
 	shortUrl := s.urlGen.Generate()
 
-	err := s.urlRepo.SaveURL(ctx, shortUrl, url)
+	err := s.urlRepo.SaveURL(ctx, userID, shortUrl, url)
 
 	var attempts int
 	for err != nil {
@@ -69,7 +70,7 @@ func (s *ShortenerService) GenerateURL(ctx context.Context, url string) (string,
 			return "", err
 		}
 		shortUrl = s.urlGen.Generate()
-		err = s.urlRepo.SaveURL(ctx, shortUrl, url)
+		err = s.urlRepo.SaveURL(ctx, userID, shortUrl, url)
 		attempts++
 	}
 
@@ -81,7 +82,8 @@ func (s *ShortenerService) GenerateURL(ctx context.Context, url string) (string,
 	return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), nil
 }
 
-func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error) {
+func (s *ShortenerService) GenerateURLBatch(ctx context.Context, userID int32, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error) {
+
 	batch := make([]model.URL, 0, s.batchSize)
 	shortUrls := make([]model.GenerateURLBatchResponse, 0, len(urls))
 
@@ -105,7 +107,7 @@ func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.Ge
 			})
 		}
 		// Сам батч меняется, если какие то урлы уже есть в базе
-		err := s.urlRepo.SaveURLBatch(ctx, batch)
+		err := s.urlRepo.SaveURLBatch(ctx, userID, batch)
 
 		// если нашлась коллизия в базе
 		if err != nil {
@@ -150,6 +152,18 @@ func (s *ShortenerService) GenerateURLBatch(ctx context.Context, urls []model.Ge
 
 func (s *ShortenerService) GetURL(ctx context.Context, shortUrl string) (string, error) {
 	return s.urlRepo.GetURL(ctx, shortUrl)
+}
+
+func (s *ShortenerService) GetUserURLs(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error) {
+	userURL, err := s.urlRepo.GetUserURL(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	for i := range userURL {
+		userURL[i].ShortURL = fmt.Sprintf("%s/%s", s.baseUrl, userURL[i].ShortURL)
+	}
+
+	return userURL, nil
 }
 
 func (s *ShortenerService) Ping(ctx context.Context) error {
