@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"github.com/paulwwyvern/urlshortener/internal/service/shortener/workers"
 	"go.uber.org/zap"
+	"sync"
 )
 
 // Репа где хранятся ссылки
@@ -16,8 +18,8 @@ type UrlRepository interface {
 	GetUserURL(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error)
 	SaveURL(ctx context.Context, userId int32, shortUrl string, url string) error
 	SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error
+	SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error
 	Ping(context.Context) error
-	Close() error
 }
 
 // Генератор коротких ссылок
@@ -33,20 +35,78 @@ type ShortenerService struct {
 
 	urlRepo UrlRepository
 	urlGen  UrlGenerator
+
+	purgeCh      chan string
+	purgeWg      sync.WaitGroup
+	purgeWorkers []*workers.PurgeWorker
+
+	doneCh chan struct{}
+
+	errWorker *workers.ErrorWorker
 }
 
-func NewShortener(logger *zap.Logger, baseUrl string, batchSize int, urlRepo UrlRepository, urlGen UrlGenerator) *ShortenerService {
+type ShortenerServiceConfig struct {
+	BaseUrl   string
+	BatchSize int
+
+	URLRepository UrlRepository
+	URLGenerator  UrlGenerator
+
+	PurgeWorkersCount  int
+	PurgeWorkersConfig workers.PurgeWorkerConfig
+}
+
+func NewShortener(logger *zap.Logger, config ShortenerServiceConfig) *ShortenerService {
 	logger.Info("Creating shortener service")
 
-	return &ShortenerService{
+	s := &ShortenerService{
 		logger: logger,
 
-		baseUrl:   baseUrl,
-		batchSize: batchSize,
+		baseUrl:   config.BaseUrl,
+		batchSize: config.BatchSize,
 
-		urlRepo: urlRepo,
-		urlGen:  urlGen,
+		urlRepo: config.URLRepository,
+		urlGen:  config.URLGenerator,
+
+		purgeCh:      make(chan string, config.PurgeWorkersCount),
+		doneCh:       make(chan struct{}),
+		purgeWorkers: make([]*workers.PurgeWorker, 0, config.PurgeWorkersCount),
 	}
+
+	purgeConfig := config.PurgeWorkersConfig
+
+	// purgeCh - канал по которому приходят урлы для удаления
+	// errChs - каналы по которым приходят ошибки от воркеров
+	purgeConfig.InputChan = s.purgeCh
+	errChs := make([]<-chan error, 0, config.PurgeWorkersCount)
+
+	for i := 0; i < config.PurgeWorkersCount; i++ {
+		s.purgeWg.Add(1)
+
+		pw := workers.NewPurgeWorker(logger, i, purgeConfig)
+		s.purgeWorkers = append(s.purgeWorkers, pw)
+
+		errChs = append(errChs, pw.GetErrCh())
+
+		go func() {
+			pw.Wait()
+			s.purgeWg.Done()
+		}()
+	}
+
+	s.purgeWg.Add(1)
+	s.errWorker = workers.NewErrorWorker(logger, errChs...)
+	go func() {
+		s.errWorker.Wait()
+		s.purgeWg.Done()
+	}()
+
+	go func() {
+		s.purgeWg.Wait()
+		close(s.doneCh)
+	}()
+
+	return s
 }
 
 func (s *ShortenerService) GenerateURL(ctx context.Context, userID int32, url string) (string, error) {
@@ -166,6 +226,25 @@ func (s *ShortenerService) GetUserURLs(ctx context.Context, userId int32) ([]mod
 	return userURL, nil
 }
 
+func (s *ShortenerService) DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error {
+	err := s.urlRepo.SoftDeleteURLBatch(ctx, userId, shortURLs)
+	if err != nil {
+		return err
+	}
+
+	for _, shortURL := range shortURLs {
+		s.purgeCh <- shortURL
+	}
+
+	return nil
+}
+
 func (s *ShortenerService) Ping(ctx context.Context) error {
 	return s.urlRepo.Ping(ctx)
+}
+
+func (s *ShortenerService) Close() error {
+	close(s.purgeCh)
+	<-s.doneCh
+	return nil
 }

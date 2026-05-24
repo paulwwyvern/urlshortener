@@ -41,20 +41,6 @@ func (m *MockUrlRepository) EXPECT() *MockUrlRepositoryMockRecorder {
 	return m.recorder
 }
 
-// Close mocks base method.
-func (m *MockUrlRepository) Close() error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Close indicates an expected call of Close.
-func (mr *MockUrlRepositoryMockRecorder) Close() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockUrlRepository)(nil).Close))
-}
-
 // GetShortURL mocks base method.
 func (m *MockUrlRepository) GetShortURL(ctx context.Context, url string) (string, error) {
 	m.ctrl.T.Helper()
@@ -140,6 +126,20 @@ func (m *MockUrlRepository) SaveURLBatch(ctx context.Context, userId int32, urls
 func (mr *MockUrlRepositoryMockRecorder) SaveURLBatch(ctx, userId, urls any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURLBatch", reflect.TypeOf((*MockUrlRepository)(nil).SaveURLBatch), ctx, userId, urls)
+}
+
+// SoftDeleteURLBatch mocks base method.
+func (m *MockUrlRepository) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SoftDeleteURLBatch", ctx, userId, shortUrls)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SoftDeleteURLBatch indicates an expected call of SoftDeleteURLBatch.
+func (mr *MockUrlRepositoryMockRecorder) SoftDeleteURLBatch(ctx, userId, shortUrls any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteURLBatch", reflect.TypeOf((*MockUrlRepository)(nil).SoftDeleteURLBatch), ctx, userId, shortUrls)
 }
 
 // MockUrlGenerator is a mock of UrlGenerator interface.

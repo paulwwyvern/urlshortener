@@ -41,6 +41,20 @@ func (m *MockShortenerService) EXPECT() *MockShortenerServiceMockRecorder {
 	return m.recorder
 }
 
+// DeleteURLBatch mocks base method.
+func (m *MockShortenerService) DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteURLBatch", ctx, userId, shortURLs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteURLBatch indicates an expected call of DeleteURLBatch.
+func (mr *MockShortenerServiceMockRecorder) DeleteURLBatch(ctx, userId, shortURLs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteURLBatch", reflect.TypeOf((*MockShortenerService)(nil).DeleteURLBatch), ctx, userId, shortURLs)
+}
+
 // GenerateURL mocks base method.
 func (m *MockShortenerService) GenerateURL(ctx context.Context, userId int32, url string) (string, error) {
 	m.ctrl.T.Helper()

@@ -67,33 +67,38 @@ func Migrate(source string, dsn string) error {
 }
 
 func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
-	stmt, err := s.db.PrepareContext(ctx, `SELECT url FROM url WHERE short_url = $1`)
+	stmt, err := s.db.PrepareContext(ctx, `SELECT url, is_deleted FROM url WHERE short_url = $1`)
 	if err != nil {
 		return "", fmt.Errorf("GetURL: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
 	var url string
-	err = stmt.QueryRowContext(ctx, shortUrl).Scan(&url)
+	var isDeleted bool
+	err = stmt.QueryRowContext(ctx, shortUrl).Scan(&url, &isDeleted)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", errs.ErrShortUrlNotFound
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", errs.ErrShortUrlGone
 		} else {
 			return "", fmt.Errorf("GetURL: failed to get url: %w", err)
 		}
+	}
+	if isDeleted {
+		return "", errs.ErrShortUrlGone
 	}
 	return url, nil
 }
 
 func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
-	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url FROM url WHERE url = $1`)
+	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url, is_deleted FROM url WHERE url = $1`)
 	if err != nil {
 		return "", fmt.Errorf("GetShortURL: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
 	var shortUrl string
-	err = stmt.QueryRowContext(ctx, url).Scan(&shortUrl)
+	var isDeleted bool
+	err = stmt.QueryRowContext(ctx, url).Scan(&shortUrl, &isDeleted)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", errs.ErrShortUrlNotFound
@@ -101,11 +106,15 @@ func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 			return "", fmt.Errorf("GetShortURL: failed to get url: %w", err)
 		}
 	}
+	if isDeleted {
+		return "", errs.ErrShortUrlNotFound
+	}
+
 	return shortUrl, nil
 }
 
 func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]model.GetUserURLResponse, error) {
-	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url, url FROM url WHERE user_id = $1`)
+	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url, url, is_deleted FROM url WHERE user_id = $1`)
 	if err != nil {
 		return nil, fmt.Errorf("GetUserURL: failed to prepare query: %w", err)
 	}
@@ -120,9 +129,13 @@ func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]model.GetUser
 	for rows.Next() {
 		var shortUrl string
 		var url string
-		err = rows.Scan(&shortUrl, &url)
+		var isDeleted bool
+		err = rows.Scan(&shortUrl, &url, &isDeleted)
 		if err != nil {
 			return nil, fmt.Errorf("GetUserURL: failed to scan row: %w", err)
+		}
+		if isDeleted {
+			continue
 		}
 
 		userURL = append(userURL, model.GetUserURLResponse{
@@ -211,6 +224,58 @@ func (s *Storage) SaveURLBatch(ctx context.Context, userId int32, urls []model.U
 		return fmt.Errorf("SaveURLBatch: failed to commit transaction: %w", err)
 	}
 
+	return nil
+}
+
+func (s *Storage) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("SoftDeleteURLBatch: failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `UPDATE url SET is_deleted = TRUE WHERE short_url = $1 AND user_id = $2`)
+	if err != nil {
+		return fmt.Errorf("SoftDeleteURLBatch: failed to prepare query: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, shortUrl := range shortUrls {
+		_, err = stmt.ExecContext(ctx, shortUrl, userId)
+		if err != nil {
+			return fmt.Errorf("SoftDeleteURLBatch: failed to soft delete url: %w", err)
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("SoftDeleteURLBatch: failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+func (s *Storage) PurgeURLBatch(ctx context.Context, urls []string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("PurgeURLBatch: failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `DELETE FROM url WHERE short_url = $1`)
+	if err != nil {
+		return fmt.Errorf("PurgeURLBatch: failed to prepare query: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, shortUrl := range urls {
+		_, err = stmt.ExecContext(ctx, shortUrl)
+		if err != nil {
+			return fmt.Errorf("PurgeURLBatch: failed to purge url: %w", err)
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("PurgeURLBatch: failed to commit transaction: %w", err)
+	}
 	return nil
 }
 

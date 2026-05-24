@@ -19,6 +19,7 @@ type ShortenerService interface {
 	GetUserURLs(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error)
 	GenerateURL(ctx context.Context, userId int32, url string) (string, error)
 	GenerateURLBatch(ctx context.Context, userId int32, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error)
+	DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error
 	Ping(ctx context.Context) error
 }
 
@@ -86,6 +87,8 @@ func (h *Handler) getURL(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		if errors.Is(err, errs.ErrShortUrlNotFound) {
 			w.WriteHeader(http.StatusNotFound)
+		} else if errors.Is(err, errs.ErrShortUrlGone) {
+			w.WriteHeader(http.StatusGone)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
 			return err
@@ -223,6 +226,42 @@ func (h *Handler) generateURLJsonBatch(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
+	return nil
+}
+
+func (h *Handler) DeleteURLJsonBatch(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.deleteURLJsonBatch)(w, r)
+}
+
+func (h *Handler) deleteURLJsonBatch(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, h.maxBodyLength))
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			w.WriteHeader(http.StatusRequestTimeout)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		return err
+	}
+
+	req := []string{}
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return err
+	}
+
+	userID := httpuser.GetUserID(r)
+	err = h.service.DeleteURLBatch(ctx, userID, req)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	w.WriteHeader(http.StatusAccepted)
 	return nil
 }
 

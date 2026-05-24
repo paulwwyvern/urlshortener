@@ -9,11 +9,13 @@ import (
 	mwauth "github.com/paulwwyvern/urlshortener/internal/handler/middleware/auth"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
+	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
 	"github.com/paulwwyvern/urlshortener/internal/repository/userstorage"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener"
+	"github.com/paulwwyvern/urlshortener/internal/service/shortener/workers"
 	"github.com/paulwwyvern/urlshortener/internal/service/user"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
@@ -43,7 +45,23 @@ const (
 	migrationSource = "./migrations"
 
 	authSignKey = "super sign key"
+
+	purgeWorkersCount = 2
+	purgeBatchSize    = 10
+	purgeInterval     = 10 * time.Second
 )
+
+type UrlRepository interface {
+	GetURL(ctx context.Context, shortUrl string) (string, error)
+	GetShortURL(ctx context.Context, url string) (string, error)
+	GetUserURL(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error)
+	SaveURL(ctx context.Context, userId int32, shortUrl string, url string) error
+	SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error
+	SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error
+	PurgeURLBatch(ctx context.Context, urls []string) error
+	Ping(context.Context) error
+	Close() error
+}
 
 func main() {
 
@@ -76,7 +94,7 @@ func main() {
 	)
 
 	// init repo
-	var repo shortener.UrlRepository
+	var repo UrlRepository
 	if conf.DatabaseDsn != "" {
 		repo, err = postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
 	} else if conf.FileStoragePath != "" {
@@ -102,7 +120,22 @@ func main() {
 	logger.Info("Init random generator")
 
 	// init service
-	shortenerService := shortener.NewShortener(logger, conf.BaseUrl, batchSize, repo, generator)
+	shortenerServiceConfig := shortener.ShortenerServiceConfig{
+		BaseUrl:           conf.BaseUrl,
+		BatchSize:         batchSize,
+		URLRepository:     repo,
+		URLGenerator:      generator,
+		PurgeWorkersCount: purgeWorkersCount,
+		PurgeWorkersConfig: workers.PurgeWorkerConfig{
+			BatchSize:     purgeBatchSize,
+			PurgeInterval: purgeInterval,
+			URLRepository: repo,
+		},
+	}
+
+	shortenerService := shortener.NewShortener(logger, shortenerServiceConfig)
+	defer shortenerService.Close()
+
 	userService := user.NewService(logger, userRepo)
 
 	// init handler
@@ -121,6 +154,7 @@ func main() {
 		r.Use(mwauth.WithAuth(authSignKey, userService))
 
 		r.Get("/api/user/urls", h.GetUserURLs)
+		r.Delete("/api/user/urls", h.DeleteURLJsonBatch)
 	})
 	r.Group(func(r chi.Router) {
 		r.Use(mwauth.WithAuth(authSignKey, userService))
@@ -164,4 +198,5 @@ func main() {
 		logger.Fatal("failed to graceful shutdown server", zap.Error(err))
 	}
 	logger.Info("shutdown complete")
+
 }

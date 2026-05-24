@@ -26,7 +26,7 @@ func NewStorage(logger *zap.Logger, file string) (*Storage, error) {
 		return nil, err
 	}
 
-	f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(file, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -70,53 +70,16 @@ func readStorage(file string) (*inmemory.Storage, error) {
 
 }
 
-func (s *Storage) SaveURL(ctx context.Context, userID int32, shortUrl string, originalUrl string) error {
-	err := s.Storage.SaveURL(ctx, userID, shortUrl, originalUrl)
-	if err != nil {
-		return err
-	}
+func (s *Storage) Close() error {
 
-	url := model.URLFile{
-		ShortURL:    shortUrl,
-		OriginalURL: originalUrl,
-	}
-
-	err = s.encoder.Encode(&url)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Storage) SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error {
-	err := s.Storage.SaveURLBatch(ctx, userID, urls)
-	if err != nil {
-		return err
-	}
-
+	urls := s.GetAllURLs()
 	for _, url := range urls {
-		u := model.URLFile{
-			ShortURL:    url.ShortURL,
-			OriginalURL: url.OriginalURL,
-		}
-
-		if url.IsExist {
-			continue
-		}
-
-		err = s.encoder.Encode(&u)
+		err := s.encoder.Encode(&url)
 
 		if err != nil {
 			return err
 		}
-
 	}
 
-	return nil
-}
-
-func (s *Storage) Close() error {
 	return s.file.Close()
 }
