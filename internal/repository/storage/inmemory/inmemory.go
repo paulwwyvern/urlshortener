@@ -160,7 +160,7 @@ func (s *Storage) SoftDeleteURLBatch(_ context.Context, userId int32, shortUrls 
 	}
 
 	for _, shortUrl := range shortUrls {
-		url := s.originalUrlIndex[shortUrl]
+		url := s.shortUrlIndex[shortUrl]
 		delete(s.shortUrlIndex, url.ShortURL)
 		delete(s.originalUrlIndex, url.OriginalURL)
 		if set, ok := s.userIDIndex[userId]; ok {
