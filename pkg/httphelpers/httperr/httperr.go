@@ -15,7 +15,6 @@ func Adapt(h HTTPHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := h(w, r)
 		*r = *r.WithContext(context.WithValue(r.Context(), Error, err))
-
 	}
 }
 

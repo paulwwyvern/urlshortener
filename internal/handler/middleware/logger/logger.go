@@ -1,7 +1,8 @@
 package logger
 
 import (
-	"github.com/paulwwyvern/urlshortener/internal/handler/httperr"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
@@ -50,8 +51,10 @@ func WithLogger(logger *zap.Logger) func(h http.Handler) http.Handler {
 			duration := time.Since(start)
 
 			err := httperr.GetError(r)
+			userId := httpuser.GetUserID(r)
 
 			logger.Info("Get request",
+				zap.Int32("user id", userId),
 				zap.String("uri", uri),
 				zap.String("method", method),
 				zap.Int("response status", response.status),

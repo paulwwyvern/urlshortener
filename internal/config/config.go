@@ -28,8 +28,8 @@ func ParseConfig() (*Config, error) {
 		return nil, err
 	}
 
-	envConfPath := os.Getenv("CONFIG_FILE")
-	if envConfPath != "" {
+	envConfPath, ok := os.LookupEnv("CONFIG_FILE")
+	if ok {
 		conf.ConfigPath = envConfPath
 	}
 

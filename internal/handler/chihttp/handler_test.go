@@ -70,11 +70,11 @@ func TestHandler_GenerateURL(t *testing.T) {
 
 			svc := NewMockShortenerService(ctrl)
 
-			svc.EXPECT().GenerateURL(gomock.Any(), tt.body).Return(tt.want.response, tt.wantErr)
+			svc.EXPECT().GenerateURL(gomock.Any(), gomock.Any(), tt.body).Return(tt.want.response, tt.wantErr)
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Post("/", h.GenerateURL)
 
 			r := httptest.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.body))
 
@@ -119,7 +119,15 @@ func TestHandler_GetURL(t *testing.T) {
 			},
 			wantErr: errs.ErrShortUrlNotFound,
 		}, {
-			name: "Test #3 Internal error",
+			name: "Test #3 Gone",
+			url:  "/Scuf38812",
+			want: want{
+				code:     410,
+				location: ``,
+			},
+			wantErr: errs.ErrShortUrlGone,
+		}, {
+			name: "Test #4 Internal error",
 			url:  "/Scuf38812",
 			want: want{
 				code:     500,
@@ -140,7 +148,7 @@ func TestHandler_GetURL(t *testing.T) {
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Get("/{url}", h.GetURL)
 
 			r := httptest.NewRequest(http.MethodGet, tt.url, nil)
 
@@ -151,6 +159,79 @@ func TestHandler_GetURL(t *testing.T) {
 			assert.Equal(t, tt.want.code, w.Code)
 			assert.Equal(t, tt.want.location, w.Header().Get("Location"))
 
+		})
+	}
+}
+
+func TestHandler_GetUserURLs(t *testing.T) {
+	type want struct {
+		code int
+		body string
+	}
+
+	tests := []struct {
+		name    string
+		method  string
+		url     string
+		want    want
+		wantErr error
+	}{
+		{
+			name: "Test #1 Success",
+			url:  "/api/user/urls",
+			want: want{
+				code: 200,
+				body: `[{"short_url": "http://localhost:8080/gIb8VTucox","original_url": "https://example.com"},
+						{"short_url": "http://localhost:8080/et6TAyR6xm","original_url": "https://yandex.com"}]`,
+			},
+			wantErr: nil,
+		}, {
+			name: "Test #2 No Content",
+			url:  "/api/user/urls",
+			want: want{
+				code: 204,
+				body: "",
+			},
+			wantErr: nil,
+		}, {
+			name: "Test #3 Internal error",
+			url:  "/api/user/urls",
+			want: want{
+				code: 500,
+				body: "",
+			},
+			wantErr: errors.New("Internal error"),
+		},
+	}
+
+	logger := zap.NewNop()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			svc := NewMockShortenerService(ctrl)
+
+			svcResponse := []model.GetUserURLResponse{}
+			json.Unmarshal([]byte(tt.want.body), &svcResponse)
+
+			svc.EXPECT().GetUserURLs(gomock.Any(), gomock.Any()).Return(svcResponse, tt.wantErr)
+
+			h := NewHandler(logger, svc, 1024)
+			mux := chi.NewRouter()
+			mux.Get("/api/user/urls", h.GetUserURLs)
+
+			r := httptest.NewRequest(http.MethodGet, tt.url, nil)
+
+			w := httptest.NewRecorder()
+
+			mux.ServeHTTP(w, r)
+
+			assert.Equal(t, tt.want.code, w.Code)
+			if tt.want.body != "" {
+				assert.JSONEq(t, tt.want.body, w.Body.String())
+			} else {
+				assert.Empty(t, w.Body.String())
+			}
 		})
 	}
 }
@@ -231,11 +312,11 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := NewMockShortenerService(ctrl)
 			if tt.wantServiceCall {
-				svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, tt.wantErr)
+				svc.EXPECT().GenerateURL(gomock.Any(), gomock.Any(), tt.request).Return(tt.want.response, tt.wantErr)
 			}
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Post("/api/shorten", h.GenerateURLJson)
 
 			r := httptest.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.body))
 
@@ -321,11 +402,11 @@ func TestHandler_GenerateUrlBatch(t *testing.T) {
 				svcResponse := []model.GenerateURLBatchResponse{}
 				json.Unmarshal([]byte(tt.want.body), &svcResponse)
 
-				svc.EXPECT().GenerateURLBatch(gomock.Any(), svcRequest).Return(svcResponse, tt.wantErr)
+				svc.EXPECT().GenerateURLBatch(gomock.Any(), gomock.Any(), svcRequest).Return(svcResponse, tt.wantErr)
 			}
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Post("/api/shorten/batch", h.GenerateURLJsonBatch)
 
 			r := httptest.NewRequest(http.MethodPost, tt.url, strings.NewReader(tt.body))
 
@@ -345,12 +426,9 @@ func TestHandler_GenerateUrlBatch(t *testing.T) {
 	}
 }
 
-func TestHandler_Router(t *testing.T) {
+func TestHandler_DeleteURLJsonBatch(t *testing.T) {
 	type want struct {
-		code     int
-		body     string
-		response string
-		location string
+		code int
 	}
 
 	tests := []struct {
@@ -358,41 +436,26 @@ func TestHandler_Router(t *testing.T) {
 		method  string
 		url     string
 		body    string
-		request string
 		want    want
+		wantErr error
 	}{
 		{
-			name:    "Test #1 Post /",
-			method:  http.MethodPost,
-			url:     "/",
-			body:    "http://example.com",
-			request: "http://example.com",
+			name: "Test #1 Success",
+			url:  "/api/user/urls",
+			body: `["aaa","bbb","ccc","ddd"]`,
+			want: want{
+				code: 202,
+			},
+			wantErr: nil,
+		}, {
+			name: "Test #3 Internal error",
+			url:  "/api/user/urls",
+			body: `["aaa","bbb","ccc","ddd"]`,
 
 			want: want{
-				code:     201,
-				response: `http://localhost:8080/`,
-				body:     `http://localhost:8080/`,
+				code: 500,
 			},
-		}, {
-			name:   "Test #2 Get /short",
-			method: http.MethodGet,
-			url:    "/short",
-			want: want{
-				code:     307,
-				body:     "<a href=\"http://example.com\">Temporary Redirect</a>.\n\n",
-				location: "http://example.com",
-			},
-		}, {
-			name:    "Test #3 Get /api/shorten",
-			method:  http.MethodPost,
-			url:     "/api/shorten",
-			body:    `{"url":"http://example.com"}`,
-			request: "http://example.com",
-			want: want{
-				code:     201,
-				body:     "{\"result\":\"http://localhost:8080/\"}\n",
-				response: `http://localhost:8080/`,
-			},
+			wantErr: errors.New("Internal error"),
 		},
 	}
 
@@ -403,25 +466,25 @@ func TestHandler_Router(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := NewMockShortenerService(ctrl)
 
-			if tt.method == http.MethodGet {
-				svc.EXPECT().GetURL(gomock.Any(), tt.url[1:]).Return(tt.want.location, nil)
-			}
-			if tt.method == http.MethodPost {
-				svc.EXPECT().GenerateURL(gomock.Any(), tt.request).Return(tt.want.response, nil)
-			}
+			svcRequest := []string{}
+			json.Unmarshal([]byte(tt.body), &svcRequest)
+
+			svc.EXPECT().DeleteURLBatch(gomock.Any(), gomock.Any(), svcRequest).Return(tt.wantErr)
 
 			h := NewHandler(logger, svc, 1024)
 			mux := chi.NewRouter()
-			h.RegisterRoutes(mux)
+			mux.Delete("/api/user/urls", h.DeleteURLJsonBatch)
 
-			r := httptest.NewRequest(tt.method, tt.url, strings.NewReader(tt.body))
+			r := httptest.NewRequest(http.MethodDelete, tt.url, strings.NewReader(tt.body))
+
 			w := httptest.NewRecorder()
 
 			mux.ServeHTTP(w, r)
 
 			assert.Equal(t, tt.want.code, w.Code)
-			assert.Equal(t, tt.want.body, w.Body.String())
-			assert.Equal(t, tt.want.location, w.Header().Get("Location"))
+
+			assert.Empty(t, w.Body.String())
+
 		})
 	}
 }

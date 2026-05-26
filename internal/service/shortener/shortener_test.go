@@ -1,22 +1,25 @@
-package service
+package shortener
 
 import (
 	"context"
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"github.com/paulwwyvern/urlshortener/internal/service/shortener/workers"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 	"testing"
+	"time"
 )
 
-//go:generate mockgen -source=shortener.go -destination=mock_shortener.go -package=service
+//go:generate mockgen -source=shortener.go -destination=mock_shortener.go -package=shortener
 
 func TestShortenerService_GenerateURL_Success(t *testing.T) {
 	tests := []struct {
 		name    string
 		baseUrl string
 
+		userId      int32
 		url         string
 		genShortUrl string
 
@@ -26,6 +29,7 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 		{
 			name:        "Test #1 Success",
 			baseUrl:     "http://localhost:8080",
+			userId:      1,
 			url:         "http://example.com",
 			genShortUrl: "H3dsKvz9o",
 
@@ -34,6 +38,7 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 		}, {
 			name:        "Test #2 Success",
 			baseUrl:     "http://127.0.0.1:9090",
+			userId:      333,
 			url:         "http://yandex.ru",
 			genShortUrl: "DlOi82Xkf",
 
@@ -51,14 +56,28 @@ func TestShortenerService_GenerateURL_Success(t *testing.T) {
 
 			gen := NewMockUrlGenerator(ctrl)
 			repo := NewMockUrlRepository(ctrl)
+			prepo := workers.NewMockPurgeURLRepository(ctrl)
 
 			gen.EXPECT().Generate().Return(tt.genShortUrl)
 
-			repo.EXPECT().SaveURL(gomock.Any(), tt.genShortUrl, tt.url).Return(nil)
+			repo.EXPECT().SaveURL(gomock.Any(), tt.userId, tt.genShortUrl, tt.url).Return(nil)
 
-			srv := NewShortener(logger, tt.baseUrl, 10, repo, gen)
+			conf := ShortenerServiceConfig{
+				BaseUrl:           tt.baseUrl,
+				BatchSize:         10,
+				URLRepository:     repo,
+				URLGenerator:      gen,
+				PurgeWorkersCount: 1,
+				PurgeWorkersConfig: workers.PurgeWorkerConfig{
+					BatchSize:     10,
+					PurgeInterval: 1 * time.Second,
+					URLRepository: prepo,
+				},
+			}
 
-			shortUrl, err := srv.GenerateURL(context.Background(), tt.url)
+			srv := NewShortener(logger, conf)
+
+			shortUrl, err := srv.GenerateURL(context.Background(), tt.userId, tt.url)
 
 			assert.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.want, shortUrl)
@@ -72,18 +91,33 @@ func TestShortenerService_GenerateURL_Collision(t *testing.T) {
 		defer ctrl.Finish()
 		gen := NewMockUrlGenerator(ctrl)
 		repo := NewMockUrlRepository(ctrl)
+		prepo := workers.NewMockPurgeURLRepository(ctrl)
+
 		logger := zap.NewNop()
 
 		gomock.InOrder(
 			gen.EXPECT().Generate().Return("H3dsKvz9o"),
-			repo.EXPECT().SaveURL(gomock.Any(), "H3dsKvz9o", "http://example.com").Return(errs.ErrShortUrlAlreadyExists),
+			repo.EXPECT().SaveURL(gomock.Any(), int32(1234), "H3dsKvz9o", "http://example.com").Return(errs.ErrShortUrlAlreadyExists),
 			gen.EXPECT().Generate().Return("DlOi82Xkf"),
-			repo.EXPECT().SaveURL(gomock.Any(), "DlOi82Xkf", "http://example.com").Return(nil),
+			repo.EXPECT().SaveURL(gomock.Any(), int32(1234), "DlOi82Xkf", "http://example.com").Return(nil),
 		)
 
-		srv := NewShortener(logger, "http://example.com", 10, repo, gen)
+		conf := ShortenerServiceConfig{
+			BaseUrl:           "http://example.com",
+			BatchSize:         10,
+			URLRepository:     repo,
+			URLGenerator:      gen,
+			PurgeWorkersCount: 1,
+			PurgeWorkersConfig: workers.PurgeWorkerConfig{
+				BatchSize:     10,
+				PurgeInterval: 1 * time.Second,
+				URLRepository: prepo,
+			},
+		}
 
-		shortUrl, err := srv.GenerateURL(context.Background(), "http://example.com")
+		srv := NewShortener(logger, conf)
+
+		shortUrl, err := srv.GenerateURL(context.Background(), 1234, "http://example.com")
 
 		assert.ErrorIs(t, err, nil)
 		assert.Equal(t, shortUrl, "http://example.com/DlOi82Xkf")
@@ -96,17 +130,32 @@ func TestShortenerService_GenerateURL_ExistedUrl(t *testing.T) {
 		defer ctrl.Finish()
 		gen := NewMockUrlGenerator(ctrl)
 		repo := NewMockUrlRepository(ctrl)
+		prepo := workers.NewMockPurgeURLRepository(ctrl)
+
 		logger := zap.NewNop()
 
 		gomock.InOrder(
 			gen.EXPECT().Generate().Return("H3dsKvz9o"),
-			repo.EXPECT().SaveURL(gomock.Any(), "H3dsKvz9o", "http://example.com").Return(errs.ErrOriginalUrlAlreadyExists),
+			repo.EXPECT().SaveURL(gomock.Any(), int32(1234), "H3dsKvz9o", "http://example.com").Return(errs.ErrOriginalUrlAlreadyExists),
 			repo.EXPECT().GetShortURL(gomock.Any(), "http://example.com").Return("DlOi82Xkf", nil),
 		)
 
-		srv := NewShortener(logger, "http://example.com", 10, repo, gen)
+		conf := ShortenerServiceConfig{
+			BaseUrl:           "http://example.com",
+			BatchSize:         10,
+			URLRepository:     repo,
+			URLGenerator:      gen,
+			PurgeWorkersCount: 1,
+			PurgeWorkersConfig: workers.PurgeWorkerConfig{
+				BatchSize:     10,
+				PurgeInterval: 1 * time.Second,
+				URLRepository: prepo,
+			},
+		}
 
-		shortUrl, err := srv.GenerateURL(context.Background(), "http://example.com")
+		srv := NewShortener(logger, conf)
+
+		shortUrl, err := srv.GenerateURL(context.Background(), 1234, "http://example.com")
 
 		assert.ErrorIs(t, err, errs.ErrOriginalUrlAlreadyExists)
 		assert.Equal(t, shortUrl, "http://example.com/DlOi82Xkf")
@@ -146,9 +195,24 @@ func TestShortenerService_GetURL(t *testing.T) {
 			defer ctrl.Finish()
 			gen := NewMockUrlGenerator(ctrl)
 			repo := NewMockUrlRepository(ctrl)
+			prepo := workers.NewMockPurgeURLRepository(ctrl)
+
 			repo.EXPECT().GetURL(gomock.Any(), "H3dsKvz9o").Return(tt.want, tt.wantErr)
 
-			srv := NewShortener(logger, "", 10, repo, gen)
+			conf := ShortenerServiceConfig{
+				BaseUrl:           "",
+				BatchSize:         10,
+				URLRepository:     repo,
+				URLGenerator:      gen,
+				PurgeWorkersCount: 1,
+				PurgeWorkersConfig: workers.PurgeWorkerConfig{
+					BatchSize:     10,
+					PurgeInterval: 1 * time.Second,
+					URLRepository: prepo,
+				},
+			}
+
+			srv := NewShortener(logger, conf)
 
 			shortUrl, err := srv.GetURL(context.Background(), "H3dsKvz9o")
 			assert.ErrorIs(t, err, tt.wantErr)
@@ -167,12 +231,14 @@ func TestShortenerService_GenerateURLBatch(t *testing.T) {
 
 	tests := []struct {
 		name      string
+		userId    int32
 		batchSize int
 		batch     []splitBatch
 		wantErr   error
 	}{
 		{
 			name:      "Test #1 Success",
+			userId:    1,
 			batchSize: 10,
 			batch: []splitBatch{
 				{
@@ -202,6 +268,7 @@ func TestShortenerService_GenerateURLBatch(t *testing.T) {
 		},
 		{
 			name:      "Test #2 Success split on batches",
+			userId:    12,
 			batchSize: 2,
 			batch: []splitBatch{
 				{
@@ -243,6 +310,7 @@ func TestShortenerService_GenerateURLBatch(t *testing.T) {
 		},
 		{
 			name:      "Test #3 Success split on batches",
+			userId:    124,
 			batchSize: 2,
 			batch: []splitBatch{
 				{
@@ -280,6 +348,7 @@ func TestShortenerService_GenerateURLBatch(t *testing.T) {
 
 		{
 			name:      "Test #4 Collision",
+			userId:    1234,
 			batchSize: 2,
 			batch: []splitBatch{
 				{
@@ -361,6 +430,8 @@ func TestShortenerService_GenerateURLBatch(t *testing.T) {
 			defer ctrl.Finish()
 			gen := NewMockUrlGenerator(ctrl)
 			repo := NewMockUrlRepository(ctrl)
+			prepo := workers.NewMockPurgeURLRepository(ctrl)
+
 			logger := zap.NewNop()
 
 			req := []model.GenerateURLBatchRequest{}
@@ -383,12 +454,25 @@ func TestShortenerService_GenerateURLBatch(t *testing.T) {
 					}
 				}
 
-				repo.EXPECT().SaveURLBatch(gomock.Any(), b.batch).Return(b.err)
+				repo.EXPECT().SaveURLBatch(gomock.Any(), tt.userId, b.batch).Return(b.err)
 			}
 
-			srv := NewShortener(logger, "http://example.com", tt.batchSize, repo, gen)
+			conf := ShortenerServiceConfig{
+				BaseUrl:           "http://example.com",
+				BatchSize:         tt.batchSize,
+				URLRepository:     repo,
+				URLGenerator:      gen,
+				PurgeWorkersCount: 1,
+				PurgeWorkersConfig: workers.PurgeWorkerConfig{
+					BatchSize:     10,
+					PurgeInterval: 1 * time.Second,
+					URLRepository: prepo,
+				},
+			}
 
-			resp, err := srv.GenerateURLBatch(context.Background(), req)
+			srv := NewShortener(logger, conf)
+
+			resp, err := srv.GenerateURLBatch(context.Background(), tt.userId, req)
 
 			assert.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, resp, wantResp)
