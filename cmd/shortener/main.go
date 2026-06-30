@@ -3,13 +3,26 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
+	mwaudit "github.com/paulwwyvern/urlshortener/internal/handler/middleware/audit"
 	mwauth "github.com/paulwwyvern/urlshortener/internal/handler/middleware/auth"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	"github.com/paulwwyvern/urlshortener/internal/model"
+	"github.com/paulwwyvern/urlshortener/internal/model/dto"
+	auditlog "github.com/paulwwyvern/urlshortener/internal/repository/audit"
+	auditpub "github.com/paulwwyvern/urlshortener/internal/service/audit"
+
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
@@ -19,13 +32,6 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/service/user"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
-	"log"
-	"net"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 const (
@@ -54,7 +60,7 @@ const (
 type UrlRepository interface {
 	GetURL(ctx context.Context, shortUrl string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
-	GetUserURL(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error)
+	GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error)
 	SaveURL(ctx context.Context, userId int32, shortUrl string, url string) error
 	SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error
 	SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error
@@ -138,6 +144,39 @@ func main() {
 
 	userService := user.NewService(logger, userRepo)
 
+	// audit
+
+	logger.Info("Init audit service")
+
+	auditPub := auditpub.NewPublisher()
+
+	{
+		logger.Info("Init audit log logger service")
+		auditSub := auditlog.NewAuditLogLogger(logger)
+		auditPub.Register(auditSub)
+		defer auditSub.Close()
+	}
+
+	if conf.AuditFile != "" {
+		logger.Info("Init audit log file service")
+		auditSub, err := auditlog.NewAuditLogFile(conf.AuditFile)
+		if err != nil {
+			logger.Fatal("Init audit file service", zap.Error(err))
+		} else {
+			auditPub.Register(auditSub)
+			defer auditSub.Close()
+		}
+	}
+
+	if conf.AuditUrl != "" {
+		logger.Info("Init audit log url service")
+
+		auditSub := auditlog.NewAuditLogUrl(conf.AuditUrl)
+
+		auditPub.Register(auditSub)
+		defer auditSub.Close()
+	}
+
 	// init handler
 	h := chihttp.NewHandler(logger, shortenerService, handlerMaxBodyLength)
 
@@ -148,7 +187,10 @@ func main() {
 	r.Use(mwlogger.WithLogger(logger))
 	r.Use(mwcompress.WithCompress())
 
-	r.Get("/{url}", h.GetURL)
+	r.Group(func(r chi.Router) {
+		r.Use(mwaudit.WithAudit(auditPub, "follow"))
+		r.Get("/{url}", h.GetURL)
+	})
 	r.Get("/ping", h.Ping)
 	r.Group(func(r chi.Router) {
 		r.Use(mwauth.WithAuth(authSignKey, userService))
@@ -159,8 +201,12 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(mwauth.WithAuth(authSignKey, userService))
 
-		r.Post("/", h.GenerateURL)
-		r.Post("/api/shorten", h.GenerateURLJson)
+		r.Group(func(r chi.Router) {
+			r.Use(mwaudit.WithAudit(auditPub, "shorten"))
+
+			r.Post("/", h.GenerateURL)
+			r.Post("/api/shorten", h.GenerateURLJson)
+		})
 		r.Post("/api/shorten/batch", h.GenerateURLJsonBatch)
 	})
 

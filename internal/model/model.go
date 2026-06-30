@@ -7,32 +7,16 @@ type URL struct {
 	IsExist     bool   `json:"-"`
 }
 
-type GetUserURLResponse struct {
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
-}
-
-type GenerateURLBatchRequest struct {
-	ID          string `json:"correlation_id"`
-	OriginalURL string `json:"original_url"`
-}
-
-type GenerateURLBatchResponse struct {
-	ID       string `json:"correlation_id"`
-	ShortURL string `json:"short_url"`
-}
-
-type GenerateURLJsonRequest struct {
-	URL string `json:"url"`
-}
-
-type GenerateURLJsonResponse struct {
-	Result string `json:"result"`
-}
-
 type URLFile struct {
 	ID          string `json:"id,omitempty"`
 	UserID      int32  `json:"user_id"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+}
+
+type AuditEvent struct {
+	TS     int64  `json:"ts"`
+	Action string `json:"action"`
+	UserID int32  `json:"user_id"`
+	URL    string `json:"url"`
 }

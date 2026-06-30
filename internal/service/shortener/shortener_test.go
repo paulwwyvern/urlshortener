@@ -2,14 +2,16 @@ package shortener
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/paulwwyvern/urlshortener/internal/model"
+	"github.com/paulwwyvern/urlshortener/internal/model/dto"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener/workers"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
-	"testing"
-	"time"
 )
 
 //go:generate mockgen -source=shortener.go -destination=mock_shortener.go -package=shortener
@@ -434,20 +436,20 @@ func TestShortenerService_GenerateURLBatch(t *testing.T) {
 
 			logger := zap.NewNop()
 
-			req := []model.GenerateURLBatchRequest{}
-			wantResp := []model.GenerateURLBatchResponse{}
+			req := []dto.GenerateURLBatchRequest{}
+			wantResp := []dto.GenerateURLBatchResponse{}
 
 			for _, b := range tt.batch {
 				for _, url := range b.batch {
 					gen.EXPECT().Generate().Return(url.ShortURL)
 					if b.inRequest {
-						req = append(req, model.GenerateURLBatchRequest{
+						req = append(req, dto.GenerateURLBatchRequest{
 							ID:          url.ID,
 							OriginalURL: url.OriginalURL,
 						})
 					}
 					if b.inResponse {
-						wantResp = append(wantResp, model.GenerateURLBatchResponse{
+						wantResp = append(wantResp, dto.GenerateURLBatchResponse{
 							ID:       url.ID,
 							ShortURL: "http://example.com/" + url.ShortURL,
 						})

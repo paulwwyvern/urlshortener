@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -13,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/paulwwyvern/urlshortener/internal/model"
+	"github.com/paulwwyvern/urlshortener/internal/model/dto"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
 )
@@ -113,14 +115,14 @@ func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 	return shortUrl, nil
 }
 
-func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]model.GetUserURLResponse, error) {
+func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error) {
 	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url, url, is_deleted FROM url WHERE user_id = $1`)
 	if err != nil {
 		return nil, fmt.Errorf("GetUserURL: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
-	var userURL []model.GetUserURLResponse
+	var userURL []dto.GetUserURLResponse
 	rows, err := stmt.QueryContext(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("GetUserURL: failed to query rows: %w", err)
@@ -138,7 +140,7 @@ func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]model.GetUser
 			continue
 		}
 
-		userURL = append(userURL, model.GetUserURLResponse{
+		userURL = append(userURL, dto.GetUserURLResponse{
 			ShortURL:    shortUrl,
 			OriginalURL: url,
 		})

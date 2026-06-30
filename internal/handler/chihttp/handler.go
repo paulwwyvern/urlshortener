@@ -4,21 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/v5"
-	"github.com/paulwwyvern/urlshortener/internal/model"
-	"github.com/paulwwyvern/urlshortener/internal/model/errs"
-	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
-	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/paulwwyvern/urlshortener/internal/model/dto"
+	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpurl"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
+	"go.uber.org/zap"
 )
 
 type ShortenerService interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
-	GetUserURLs(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error)
+	GetUserURLs(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error)
 	GenerateURL(ctx context.Context, userId int32, url string) (string, error)
-	GenerateURLBatch(ctx context.Context, userId int32, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error)
+	GenerateURLBatch(ctx context.Context, userId int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error)
 	DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error
 	Ping(ctx context.Context) error
 }
@@ -56,7 +58,9 @@ func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 
 	userID := httpuser.GetUserID(r)
 
-	shortURL, err := h.service.GenerateURL(ctx, userID, string(body))
+	url := string(body)
+
+	shortURL, err := h.service.GenerateURL(ctx, userID, url)
 	w.Header().Set("Content-Type", "text/plain")
 	if err != nil {
 		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
@@ -69,6 +73,7 @@ func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 		w.WriteHeader(http.StatusCreated)
 	}
 
+	httpurl.SetURL(r, url)
 	w.Write([]byte(shortURL))
 
 	return nil
@@ -96,6 +101,7 @@ func (h *Handler) getURL(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
+	httpurl.SetURL(r, url)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	return nil
 }
@@ -148,7 +154,7 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	req := model.GenerateURLJsonRequest{}
+	req := dto.GenerateURLJsonRequest{}
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -172,7 +178,7 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	res := model.GenerateURLJsonResponse{
+	res := dto.GenerateURLJsonResponse{
 		Result: url,
 	}
 
@@ -181,6 +187,8 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		w.WriteHeader(http.StatusInternalServerError)
 		return err
 	}
+
+	httpurl.SetURL(r, url)
 
 	return nil
 }
@@ -202,7 +210,7 @@ func (h *Handler) generateURLJsonBatch(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
-	req := []model.GenerateURLBatchRequest{}
+	req := []dto.GenerateURLBatchRequest{}
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
