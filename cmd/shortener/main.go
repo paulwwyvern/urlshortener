@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/paulwwyvern/urlshortener/internal/config"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	mwaudit "github.com/paulwwyvern/urlshortener/internal/handler/middleware/audit"
@@ -21,15 +22,16 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/dto"
 	auditlog "github.com/paulwwyvern/urlshortener/internal/repository/audit"
-	auditpub "github.com/paulwwyvern/urlshortener/internal/service/audit"
-
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/file"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
+	"github.com/paulwwyvern/urlshortener/internal/repository/storage/throughcache"
 	"github.com/paulwwyvern/urlshortener/internal/repository/userstorage"
+	auditpub "github.com/paulwwyvern/urlshortener/internal/service/audit"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener/workers"
 	"github.com/paulwwyvern/urlshortener/internal/service/user"
+	"github.com/paulwwyvern/urlshortener/pkg/lrucache"
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
 )
@@ -41,8 +43,8 @@ const (
 	batchSize = 10
 
 	serverReadTimeout  = 5 * time.Second
-	serverWriteTimeout = 5 * time.Second
-	serverIdleTimeout  = 30 * time.Second
+	serverWriteTimeout = 31 * time.Second
+	serverIdleTimeout  = 31 * time.Second
 
 	handlerMaxBodyLength = 1024 * 1024
 
@@ -55,6 +57,8 @@ const (
 	purgeWorkersCount = 2
 	purgeBatchSize    = 10
 	purgeInterval     = 10 * time.Second
+
+	cacheCapacity = 10
 )
 
 type UrlRepository interface {
@@ -102,7 +106,14 @@ func main() {
 	// init repo
 	var repo UrlRepository
 	if conf.DatabaseDsn != "" {
-		repo, err = postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
+
+		cache := lrucache.NewLRUCache[string, string](cacheCapacity)
+		storage, storageErr := postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
+
+		repo = throughcache.NewCache(cache, storage)
+		err = storageErr
+
+		//repo, err = postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
 	} else if conf.FileStoragePath != "" {
 		repo, err = file.NewStorage(logger, conf.FileStoragePath)
 	} else {
@@ -187,11 +198,13 @@ func main() {
 	r.Use(mwlogger.WithLogger(logger))
 	r.Use(mwcompress.WithCompress())
 
+	r.Get("/ping", h.Ping)
+	r.Mount("/debug", middleware.Profiler())
+
 	r.Group(func(r chi.Router) {
 		r.Use(mwaudit.WithAudit(auditPub, "follow"))
 		r.Get("/{url}", h.GetURL)
 	})
-	r.Get("/ping", h.Ping)
 	r.Group(func(r chi.Router) {
 		r.Use(mwauth.WithAuth(authSignKey, userService))
 
