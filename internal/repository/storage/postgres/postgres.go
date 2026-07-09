@@ -10,7 +10,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/paulwwyvern/urlshortener/internal/model"
@@ -107,7 +106,7 @@ func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 	var isDeleted bool
 	err = stmt.QueryRowContext(ctx, url).Scan(&shortUrl, &isDeleted)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return "", errs.ErrShortUrlNotFound
 		} else {
 			return "", fmt.Errorf("GetShortURL: failed to get url: %w", err)
