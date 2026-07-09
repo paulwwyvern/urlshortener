@@ -24,12 +24,14 @@ const (
 	originalUrlConstraintName = "url_unique"
 )
 
+// Storage позволяет взаимодействовать с бд postgres
 type Storage struct {
 	db *sql.DB
-
-	tx map[int64]*sql.Tx
 }
 
+// NewStorage создаёт объект Storage с коннектом к бд postgres.
+//
+// Флаг migrate указывает, должна ли состояться миграция.
 func NewStorage(logger *zap.Logger, dsn string, migrate bool, migrationSource string) (*Storage, error) {
 	if migrate {
 		logger.Info("Initializing migration")
@@ -53,9 +55,10 @@ func NewStorage(logger *zap.Logger, dsn string, migrate bool, migrationSource st
 	}
 	logger.Info("Created connection to postgres storage")
 
-	return &Storage{db: db, tx: make(map[int64]*sql.Tx)}, nil
+	return &Storage{db: db}, nil
 }
 
+// Migrate совершает миграцию, автоматически выполняется, если при создании объекта storage указан флаг
 func Migrate(source string, dsn string) error {
 	m, err := migrate.New("file://"+source, dsn)
 	if err != nil {
@@ -68,6 +71,7 @@ func Migrate(source string, dsn string) error {
 	return nil
 }
 
+// GetURL достаёт из бд оригинальный урл по его короткому урлу
 func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
 	stmt, err := s.db.PrepareContext(ctx, `SELECT url, is_deleted FROM url WHERE short_url = $1`)
 	if err != nil {
@@ -91,6 +95,7 @@ func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
 	return url, nil
 }
 
+// GetShortURL достаёт из бд короткий урл по его оригинальному урлу
 func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url, is_deleted FROM url WHERE url = $1`)
 	if err != nil {
@@ -115,6 +120,7 @@ func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 	return shortUrl, nil
 }
 
+// GetUserURL достаёт из бд все урлы, созданные конкретным пользователем
 func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error) {
 	stmt, err := s.db.PrepareContext(ctx, `SELECT short_url, url, is_deleted FROM url WHERE user_id = $1`)
 	if err != nil {
@@ -152,6 +158,7 @@ func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserUR
 	return userURL, nil
 }
 
+// SaveURL сохраняет в бд новый урл, созданный пользователем
 func (s *Storage) SaveURL(ctx context.Context, userID int32, shortUrl string, originalUrl string) error {
 	stmt, err := s.db.PrepareContext(ctx, `INSERT INTO url (short_url, url, user_id) VALUES ($1, $2, $3)`)
 	if err != nil {
@@ -178,6 +185,10 @@ func (s *Storage) SaveURL(ctx context.Context, userID int32, shortUrl string, or
 	return nil
 }
 
+// SaveURLBatch сохраняет в бд новые урлы, созданный пользователем.
+//
+// Так же если некоторые из оригинальных урлов уже существуют, то в urls они будут помечены
+// и их короткие урлы будут заменены на урлы из бд
 func (s *Storage) SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error {
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -229,6 +240,7 @@ func (s *Storage) SaveURLBatch(ctx context.Context, userId int32, urls []model.U
 	return nil
 }
 
+// SoftDeleteURLBatch помечает указанные урлы в бд, как удалённые, но физически пока не удаляет
 func (s *Storage) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -255,6 +267,7 @@ func (s *Storage) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrl
 	return nil
 }
 
+// PurgeURLBatch удаляет физически указанные урлы из бд
 func (s *Storage) PurgeURLBatch(ctx context.Context, urls []string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -281,10 +294,12 @@ func (s *Storage) PurgeURLBatch(ctx context.Context, urls []string) error {
 	return nil
 }
 
+// Close закрывает коннект к бд
 func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
+// Ping пингует бд
 func (s *Storage) Ping(ctx context.Context) error {
 	err := s.db.PingContext(ctx)
 

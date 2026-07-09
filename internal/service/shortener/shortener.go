@@ -111,6 +111,8 @@ func NewShortener(logger *zap.Logger, config ShortenerServiceConfig) *ShortenerS
 	return s
 }
 
+// GenerateURL генерирует новый короткий урл для данного урла с помощью UrlGenerator,
+// сохраняет результат в репозитории и возвращает результат
 func (s *ShortenerService) GenerateURL(ctx context.Context, userID int32, url string) (string, error) {
 
 	shortUrl := s.urlGen.Generate()
@@ -144,6 +146,8 @@ func (s *ShortenerService) GenerateURL(ctx context.Context, userID int32, url st
 	return fmt.Sprintf("%s/%s", s.baseUrl, shortUrl), nil
 }
 
+// GenerateURLBatch генерирует новые короткие урлы для данных урлов с помощью UrlGenerator,
+// сохраняет результат в репозитории и возвращает результат
 func (s *ShortenerService) GenerateURLBatch(ctx context.Context, userID int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error) {
 
 	batch := make([]model.URL, 0, s.batchSize)
@@ -212,10 +216,12 @@ func (s *ShortenerService) GenerateURLBatch(ctx context.Context, userID int32, u
 
 }
 
+// GetURL возвращает по данному короткому урлу оригинальный урл
 func (s *ShortenerService) GetURL(ctx context.Context, shortUrl string) (string, error) {
 	return s.urlRepo.GetURL(ctx, shortUrl)
 }
 
+// GetUserURLs возвращает все урлы, созданные данным пользователем
 func (s *ShortenerService) GetUserURLs(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
 	userURL, err := s.urlRepo.GetUserURL(ctx, userId)
 	if err != nil {
@@ -228,6 +234,8 @@ func (s *ShortenerService) GetUserURLs(ctx context.Context, userId int32) ([]dto
 	return userURL, nil
 }
 
+// DeleteURLBatch помечает указанные урлы как удалённые и передаёт их воркеру, чтобы он их потом
+// физически удалил
 func (s *ShortenerService) DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error {
 	err := s.urlRepo.SoftDeleteURLBatch(ctx, userId, shortURLs)
 	if err != nil {

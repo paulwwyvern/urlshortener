@@ -3,9 +3,10 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
+
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
-	"net/http"
 )
 
 type ErrUserNotFound struct {
@@ -32,6 +33,8 @@ type UserService interface {
 	CreateUser(ctx context.Context) (int32, error)
 }
 
+// WithAuthRequire возвращает middleware, который аутентифицирует пользователя через cookie
+// и если пользователь не аутентифицирован, от возвращает 401
 func WithAuthRequire(key string) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return httperr.Adapt(func(w http.ResponseWriter, r *http.Request) error {
@@ -59,6 +62,8 @@ func WithAuthRequire(key string) func(http.Handler) http.Handler {
 	}
 }
 
+// WithAuth возвращает middleware, который аутентифицирует пользователя через cookie
+// и если пользователь не аутентифицирован, от создаёт нового пользователя
 func WithAuth(key string, userService UserService) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return httperr.Adapt(func(w http.ResponseWriter, r *http.Request) error {

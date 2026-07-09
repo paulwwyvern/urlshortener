@@ -1,11 +1,12 @@
 package logger
 
 import (
+	"net/http"
+	"time"
+
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
 	"go.uber.org/zap"
-	"net/http"
-	"time"
 )
 
 type responseData struct {
@@ -36,6 +37,7 @@ func (w *loggerResponseWriter) WriteHeader(statusCode int) {
 	w.responseData.status = statusCode
 }
 
+// WithLogger возвращает middleware, который логирует каждый запрос
 func WithLogger(logger *zap.Logger) func(h http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

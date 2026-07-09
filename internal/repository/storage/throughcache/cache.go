@@ -25,6 +25,9 @@ type CacheRepository interface {
 	Delete(string)
 }
 
+// Cache реализует механизм сквозного кэширования, когда все запросы к репозиторию UrlRepository
+// проходят через Cache, который пытается достать данные из CacheRepository и если их там нет,
+// то подгружает их из UrlRepository
 type Cache struct {
 	cache CacheRepository
 	repo  UrlRepository

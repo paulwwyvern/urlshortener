@@ -1,3 +1,4 @@
+// Пакет lrucache предоставляет реализацию LRU кэша
 package lrucache
 
 import (
