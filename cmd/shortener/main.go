@@ -106,22 +106,25 @@ func main() {
 	// init repo
 	var repo UrlRepository
 	if conf.DatabaseDsn != "" {
-
 		cache := lrucache.NewLRUCache[string, string](cacheCapacity)
-		storage, storageErr := postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
+		storage, err := postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
+		if err != nil {
+			logger.Fatal("failed to init postgres storage", zap.Error(err))
+		}
 
 		repo = throughcache.NewCache(cache, storage)
-		err = storageErr
-
-		//repo, err = postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
 	} else if conf.FileStoragePath != "" {
 		repo, err = file.NewStorage(logger, conf.FileStoragePath)
+		if err != nil {
+			logger.Fatal("failed to init file storage", zap.Error(err))
+		}
 	} else {
 		repo, err = inmemory.NewStorage(logger)
+		if err != nil {
+			logger.Fatal("failed to init inmemory storage", zap.Error(err))
+		}
 	}
-	if err != nil {
-		logger.Fatal("failed to init storage", zap.Error(err))
-	}
+
 	defer repo.Close()
 
 	// init user repo
@@ -202,7 +205,7 @@ func main() {
 	r.Mount("/debug", middleware.Profiler())
 
 	r.Group(func(r chi.Router) {
-		r.Use(mwaudit.WithAudit(auditPub, "follow"))
+		r.Use(mwaudit.WithAudit(logger, auditPub, "follow"))
 		r.Get("/{url}", h.GetURL)
 	})
 	r.Group(func(r chi.Router) {
@@ -215,7 +218,7 @@ func main() {
 		r.Use(mwauth.WithAuth(authSignKey, userService))
 
 		r.Group(func(r chi.Router) {
-			r.Use(mwaudit.WithAudit(auditPub, "shorten"))
+			r.Use(mwaudit.WithAudit(logger, auditPub, "shorten"))
 
 			r.Post("/", h.GenerateURL)
 			r.Post("/api/shorten", h.GenerateURLJson)

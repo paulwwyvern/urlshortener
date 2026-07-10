@@ -1,8 +1,9 @@
 package audit
 
 import (
+	"errors"
+
 	"github.com/paulwwyvern/urlshortener/internal/model"
-	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 )
 
 type observer interface {
@@ -22,16 +23,16 @@ func (p *Publisher) Register(observer observer) {
 }
 
 func (p *Publisher) Notify(event *model.AuditEvent) error {
-	errors := make([]error, 0)
+	errs := make([]error, 0)
 	for _, o := range p.observers {
 		if err := o.Update(event); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
-	if len(errors) == 0 {
+	if len(errs) == 0 {
 		return nil
 	}
-	return errs.NewErrAuditNotify(errors...)
+	return errors.Join(errs...)
 }
 
 func (p *Publisher) Update(event *model.AuditEvent) error {

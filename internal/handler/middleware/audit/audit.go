@@ -5,23 +5,29 @@ import (
 	"time"
 
 	"github.com/paulwwyvern/urlshortener/internal/model"
-	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpurl"
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
+	"go.uber.org/zap"
 )
 
 type AuditPublisher interface {
 	Update(event *model.AuditEvent) error
 }
 
-func WithAudit(pub AuditPublisher, action string) func(http.Handler) http.Handler {
+func WithAudit(logger *zap.Logger, pub AuditPublisher, action string) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
-		return httperr.Adapt(func(w http.ResponseWriter, r *http.Request) error {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			r = httpurl.AddURL(r)
+
 			h.ServeHTTP(w, r)
 
 			timestamp := time.Now().Unix()
 			userId := httpuser.GetUserID(r)
-			url := httpurl.GetURL(r)
+			url, ok := httpurl.GetURL(r)
+
+			if !ok {
+				return
+			}
 
 			event := &model.AuditEvent{
 				TS:     timestamp,
@@ -30,7 +36,10 @@ func WithAudit(pub AuditPublisher, action string) func(http.Handler) http.Handle
 				UserID: userId,
 			}
 
-			return pub.Update(event)
+			err := pub.Update(event)
+			if err != nil {
+				logger.Info("Error updating audit event", zap.Error(err))
+			}
 		})
 	}
 }
