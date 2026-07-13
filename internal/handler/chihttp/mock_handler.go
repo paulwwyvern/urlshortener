@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	model "github.com/paulwwyvern/urlshortener/internal/model"
+	dto "github.com/paulwwyvern/urlshortener/internal/model/dto"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -71,10 +71,10 @@ func (mr *MockShortenerServiceMockRecorder) GenerateURL(ctx, userId, url any) *g
 }
 
 // GenerateURLBatch mocks base method.
-func (m *MockShortenerService) GenerateURLBatch(ctx context.Context, userId int32, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error) {
+func (m *MockShortenerService) GenerateURLBatch(ctx context.Context, userId int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateURLBatch", ctx, userId, urls)
-	ret0, _ := ret[0].([]model.GenerateURLBatchResponse)
+	ret0, _ := ret[0].([]dto.GenerateURLBatchResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -101,10 +101,10 @@ func (mr *MockShortenerServiceMockRecorder) GetURL(ctx, shortURL any) *gomock.Ca
 }
 
 // GetUserURLs mocks base method.
-func (m *MockShortenerService) GetUserURLs(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error) {
+func (m *MockShortenerService) GetUserURLs(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUserURLs", ctx, userId)
-	ret0, _ := ret[0].([]model.GetUserURLResponse)
+	ret0, _ := ret[0].([]dto.GetUserURLResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

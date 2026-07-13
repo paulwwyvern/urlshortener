@@ -3,8 +3,9 @@ package config
 import (
 	"errors"
 	"flag"
-	"github.com/ilyakaznacheev/cleanenv"
 	"os"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
 var (
@@ -17,6 +18,8 @@ type Config struct {
 	BaseUrl         string `yaml:"base_url" env:"BASE_URL" env-default:"http://localhost:8080"`
 	FileStoragePath string `yaml:"file_storage_path" env:"FILE_STORAGE_PATH"`
 	DatabaseDsn     string `yaml:"database_dsn" env:"DATABASE_DSN"`
+	AuditFile       string `yaml:"audit_file" env:"AUDIT_FILE"`
+	AuditUrl        string `yaml:"audit_url" env:"AUDIT_URL"`
 }
 
 // TODO: переписать логику обработки конфига
@@ -56,6 +59,8 @@ func flagParse(conf *Config) error {
 	flag.StringVar(&conf.BaseUrl, "b", "", "base url")
 	flag.StringVar(&conf.FileStoragePath, "f", "", "file storage path")
 	flag.StringVar(&conf.DatabaseDsn, "d", "", "database dsn")
+	flag.StringVar(&conf.AuditFile, "audit-file", "", "audit file")
+	flag.StringVar(&conf.AuditUrl, "audit-url", "", "audit url")
 
 	flag.Parse()
 	return nil

@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// WithCompress возвращает middleware, который разжимает входные данные и сжимает отправляемые данные.
+//
+// WithCompress поддерживает только gzip
 func WithCompress() func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -15,6 +18,8 @@ func WithCompress() func(http.Handler) http.Handler {
 			if supportGzip {
 				cw := newGzipResponseWriter(w)
 				ow = cw
+
+				ow.Header().Set("Content-Encoding", "gzip")
 
 				defer cw.Close()
 			}

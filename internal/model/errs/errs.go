@@ -1,6 +1,8 @@
 package errs
 
-import "errors"
+import (
+	"errors"
+)
 
 var ErrShortUrlNotFound = errors.New("short url not found")
 var ErrShortUrlGone = errors.New("short url gone")

@@ -4,21 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/v5"
-	"github.com/paulwwyvern/urlshortener/internal/model"
-	"github.com/paulwwyvern/urlshortener/internal/model/errs"
-	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
-	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/paulwwyvern/urlshortener/internal/model/dto"
+	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpurl"
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
+	"go.uber.org/zap"
 )
 
 type ShortenerService interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
-	GetUserURLs(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error)
+	GetUserURLs(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error)
 	GenerateURL(ctx context.Context, userId int32, url string) (string, error)
-	GenerateURLBatch(ctx context.Context, userId int32, urls []model.GenerateURLBatchRequest) ([]model.GenerateURLBatchResponse, error)
+	GenerateURLBatch(ctx context.Context, userId int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error)
 	DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error
 	Ping(ctx context.Context) error
 }
@@ -37,6 +39,18 @@ func NewHandler(logger *zap.Logger, service ShortenerService, maxBodyLength int6
 	}
 }
 
+// GenerateURL получает в теле запроса урл в формате text/plain,
+// для которого необходимо сгенерить новый короткий урл и возвращает его в формате text/plain
+//
+// Возвращаемые коды:
+//
+// 201 - если новый короткий урл успешно создан
+//
+// 409 - если для оригинального урла уже существует короткий урл
+//
+// 400 - невалидный запрос
+//
+// 500 - внутренняя ошибка сервера
 func (h *Handler) GenerateURL(w http.ResponseWriter, r *http.Request) {
 	httperr.Adapt(h.generateURL)(w, r)
 }
@@ -56,7 +70,9 @@ func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 
 	userID := httpuser.GetUserID(r)
 
-	shortURL, err := h.service.GenerateURL(ctx, userID, string(body))
+	url := string(body)
+
+	shortURL, err := h.service.GenerateURL(ctx, userID, url)
 	w.Header().Set("Content-Type", "text/plain")
 	if err != nil {
 		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
@@ -69,11 +85,23 @@ func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 		w.WriteHeader(http.StatusCreated)
 	}
 
+	httpurl.SetURL(r, url)
 	w.Write([]byte(shortURL))
 
 	return nil
 }
 
+// GetURL получает в uri короткий урл и редиректит на урл, который стоит за этим коротким урлом
+//
+// Возвращаемые коды:
+//
+// 307 - оригинальный урл по заданному короткому урлу найден и редирект выполнен
+//
+// 404 - если для данного короткого урла не найден оригинальный
+//
+// 409 - если для данного короткого урла найден оригинальный, но он в процессе удаления(считай удалён)
+//
+// 500 - внутренняя ошибка сервера
 func (h *Handler) GetURL(w http.ResponseWriter, r *http.Request) {
 	httperr.Adapt(h.getURL)(w, r)
 }
@@ -96,10 +124,20 @@ func (h *Handler) getURL(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
+	httpurl.SetURL(r, url)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	return nil
 }
 
+// GetUserURLs для данного пользователя возвращает все сгенеренные им урлы в формате json
+//
+// Возвращаемые коды:
+//
+// 200 - OK
+//
+// 201 - если пользователь ещё ни один урл не сгенерил
+//
+// 500 - внутренняя ошибка сервера
 func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 	httperr.Adapt(h.getUserURLs)(w, r)
 }
@@ -131,6 +169,18 @@ func (h *Handler) getUserURLs(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// GenerateURLJson получает в теле запроса урл в формате json,
+// для которого необходимо сгенерить новый короткий урл и возвращает его в формате json
+//
+// Возвращаемые коды:
+//
+// 201 - если новый короткий урл успешно создан
+//
+// 409 - если для оригинального урла уже существует короткий урл
+//
+// 400 - невалидный запрос
+//
+// 500 - внутренняя ошибка сервера
 func (h *Handler) GenerateURLJson(w http.ResponseWriter, r *http.Request) {
 	httperr.Adapt(h.generateURLJson)(w, r)
 }
@@ -148,7 +198,7 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	req := model.GenerateURLJsonRequest{}
+	req := dto.GenerateURLJsonRequest{}
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -172,7 +222,7 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	res := model.GenerateURLJsonResponse{
+	res := dto.GenerateURLJsonResponse{
 		Result: url,
 	}
 
@@ -182,9 +232,21 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
+	httpurl.SetURL(r, url)
+
 	return nil
 }
 
+// GenerateURLJsonBatch получает в теле запроса урлы в формате json,
+// для которых необходимо сгенерить новые короткий урлы и возвращают их в формате json
+//
+// Возвращаемые коды:
+//
+// 201 - если новые короткие урлы успешно созданы(даже если для некоторых уже существовали короткие)
+//
+// 400 - невалидный запрос
+//
+// 500 - внутренняя ошибка сервера
 func (h *Handler) GenerateURLJsonBatch(w http.ResponseWriter, r *http.Request) {
 	httperr.Adapt(h.generateURLJsonBatch)(w, r)
 }
@@ -202,7 +264,7 @@ func (h *Handler) generateURLJsonBatch(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
-	req := []model.GenerateURLBatchRequest{}
+	req := []dto.GenerateURLBatchRequest{}
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -229,6 +291,16 @@ func (h *Handler) generateURLJsonBatch(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+// DeleteURLJsonBatch получает в теле запроса короткие урлы в формате json,
+// которые необходимо удалить
+//
+// Возвращаемые коды:
+//
+// 202 - Запрос на удаление принят(сами урлы при попытке запроса будут пока выдавать 409, пока они окончательно не удалятся)
+//
+// 400 - невалидный запрос
+//
+// 500 - внутренняя ошибка сервера
 func (h *Handler) DeleteURLJsonBatch(w http.ResponseWriter, r *http.Request) {
 	httperr.Adapt(h.deleteURLJsonBatch)(w, r)
 }
@@ -265,6 +337,13 @@ func (h *Handler) deleteURLJsonBatch(w http.ResponseWriter, r *http.Request) err
 	return nil
 }
 
+// Ping пингует сервер
+//
+// Возвращаемые коды:
+//
+// 200 - Всё ок
+//
+// 500 - внутренняя ошибка сервера
 func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 	httperr.Adapt(h.ping)(w, r)
 }

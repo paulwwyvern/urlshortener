@@ -3,16 +3,17 @@ package chihttp
 import (
 	"encoding/json"
 	"errors"
-	"github.com/go-chi/chi/v5"
-	"github.com/paulwwyvern/urlshortener/internal/model"
-	"github.com/paulwwyvern/urlshortener/internal/model/errs"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
-	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/paulwwyvern/urlshortener/internal/model/dto"
+	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 //go:generate mockgen -source=handler.go -destination=mock_handler.go -package=chihttp
@@ -211,7 +212,7 @@ func TestHandler_GetUserURLs(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			svc := NewMockShortenerService(ctrl)
 
-			svcResponse := []model.GetUserURLResponse{}
+			svcResponse := []dto.GetUserURLResponse{}
 			json.Unmarshal([]byte(tt.want.body), &svcResponse)
 
 			svc.EXPECT().GetUserURLs(gomock.Any(), gomock.Any()).Return(svcResponse, tt.wantErr)
@@ -396,10 +397,10 @@ func TestHandler_GenerateUrlBatch(t *testing.T) {
 			svc := NewMockShortenerService(ctrl)
 
 			if tt.wantServiceCall {
-				svcRequest := []model.GenerateURLBatchRequest{}
+				svcRequest := []dto.GenerateURLBatchRequest{}
 				json.Unmarshal([]byte(tt.body), &svcRequest)
 
-				svcResponse := []model.GenerateURLBatchResponse{}
+				svcResponse := []dto.GenerateURLBatchResponse{}
 				json.Unmarshal([]byte(tt.want.body), &svcResponse)
 
 				svc.EXPECT().GenerateURLBatch(gomock.Any(), gomock.Any(), svcRequest).Return(svcResponse, tt.wantErr)

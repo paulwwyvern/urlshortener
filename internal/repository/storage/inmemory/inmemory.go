@@ -2,10 +2,12 @@ package inmemory
 
 import (
 	"context"
+	"sync"
+
 	"github.com/paulwwyvern/urlshortener/internal/model"
+	"github.com/paulwwyvern/urlshortener/internal/model/dto"
 	"github.com/paulwwyvern/urlshortener/internal/model/errs"
 	"go.uber.org/zap"
-	"sync"
 )
 
 type Storage struct {
@@ -53,15 +55,15 @@ func (s *Storage) GetShortURL(_ context.Context, originalUrl string) (string, er
 	return url.ShortURL, nil
 }
 
-func (s *Storage) GetUserURL(_ context.Context, userId int32) ([]model.GetUserURLResponse, error) {
+func (s *Storage) GetUserURL(_ context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	set := s.userIDIndex[userId]
 
-	userURLs := make([]model.GetUserURLResponse, 0, len(set))
+	userURLs := make([]dto.GetUserURLResponse, 0, len(set))
 	for url := range set {
-		userURLs = append(userURLs, model.GetUserURLResponse{
+		userURLs = append(userURLs, dto.GetUserURLResponse{
 			OriginalURL: url.OriginalURL,
 			ShortURL:    url.ShortURL,
 		})

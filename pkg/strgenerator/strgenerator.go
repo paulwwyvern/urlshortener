@@ -1,3 +1,5 @@
+// Пакет strgenerator предоставляет структуру Generator, которая умеет генерировать по запросу
+// строки заданной длины
 package strgenerator
 
 import (
@@ -5,9 +7,12 @@ import (
 	"strings"
 )
 
-const LowercaseLatin = "abcdefghijklmnopqrstuvwxyz"
-const UppercaseLatin = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const Digits = "0123456789"
+// Предопределённые последовательности символов
+const (
+	LowercaseLatin = "abcdefghijklmnopqrstuvwxyz"
+	UppercaseLatin = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	Digits         = "0123456789"
+)
 
 type Generator struct {
 	chars string
@@ -16,6 +21,13 @@ type Generator struct {
 	randGen *rand.Rand
 }
 
+// NewGenerator Создаёт новый объект Generator
+//
+// chars - последовательность символов, из которых будут генерироваться новые строки
+//
+// len - длина генерируемых строк
+//
+// seed - сид для внутреннего генератора случайных чисел. Если он равен 0, то сид выбирается случайно
 func NewGenerator(chars string, len int, seed int64) *Generator {
 	if seed == 0 {
 		seed = rand.Int63()

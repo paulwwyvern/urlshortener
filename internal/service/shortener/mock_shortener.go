@@ -14,6 +14,7 @@ import (
 	reflect "reflect"
 
 	model "github.com/paulwwyvern/urlshortener/internal/model"
+	dto "github.com/paulwwyvern/urlshortener/internal/model/dto"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -72,10 +73,10 @@ func (mr *MockUrlRepositoryMockRecorder) GetURL(ctx, shortUrl any) *gomock.Call 
 }
 
 // GetUserURL mocks base method.
-func (m *MockUrlRepository) GetUserURL(ctx context.Context, userId int32) ([]model.GetUserURLResponse, error) {
+func (m *MockUrlRepository) GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUserURL", ctx, userId)
-	ret0, _ := ret[0].([]model.GetUserURLResponse)
+	ret0, _ := ret[0].([]dto.GetUserURLResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
