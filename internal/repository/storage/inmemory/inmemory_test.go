@@ -13,30 +13,30 @@ import (
 func TestStorage_GetURL(t *testing.T) {
 	tests := []struct {
 		name          string
-		shortUrlIndex map[string]*model.URLFile
-		shortUrl      string
+		shortURLIndex map[string]*model.URLFile
+		shortURL      string
 		want          string
 		wantErr       error
 	}{
 		{
-			name: "Test #1 Url exists",
-			shortUrlIndex: map[string]*model.URLFile{
+			name: "Test #1 URL exists",
+			shortURLIndex: map[string]*model.URLFile{
 				"a": {OriginalURL: "A"},
 				"b": {OriginalURL: "B"},
 			},
-			shortUrl: "a",
+			shortURL: "a",
 			want:     "A",
 			wantErr:  nil,
 		},
 		{
-			name: "Test #2 Url does not exist",
-			shortUrlIndex: map[string]*model.URLFile{
+			name: "Test #2 URL does not exist",
+			shortURLIndex: map[string]*model.URLFile{
 				"a": {OriginalURL: "A"},
 				"b": {OriginalURL: "B"},
 			},
-			shortUrl: "c",
+			shortURL: "c",
 			want:     "",
-			wantErr:  errs.ErrShortUrlNotFound,
+			wantErr:  errs.ErrShortURLNotFound,
 		},
 	}
 
@@ -45,8 +45,8 @@ func TestStorage_GetURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s, _ := NewStorage(logger)
-			s.shortUrlIndex = tt.shortUrlIndex
-			got, err := s.GetURL(context.Background(), tt.shortUrl)
+			s.shortURLIndex = tt.shortURLIndex
+			got, err := s.GetURL(context.Background(), tt.shortURL)
 			assert.Equal(t, tt.want, got)
 			assert.ErrorIs(t, tt.wantErr, err)
 		})
@@ -56,30 +56,30 @@ func TestStorage_GetURL(t *testing.T) {
 func TestStorage_GetShortURL(t *testing.T) {
 	tests := []struct {
 		name             string
-		originalUrlIndex map[string]*model.URLFile
-		originalUrl      string
+		originalURLIndex map[string]*model.URLFile
+		originalURL      string
 		want             string
 		wantErr          error
 	}{
 		{
-			name: "Test #1 Url exists",
-			originalUrlIndex: map[string]*model.URLFile{
+			name: "Test #1 URL exists",
+			originalURLIndex: map[string]*model.URLFile{
 				"a": {ShortURL: "A"},
 				"b": {ShortURL: "B"},
 			},
-			originalUrl: "a",
+			originalURL: "a",
 			want:        "A",
 			wantErr:     nil,
 		},
 		{
-			name: "Test #2 Url does not exist",
-			originalUrlIndex: map[string]*model.URLFile{
+			name: "Test #2 URL does not exist",
+			originalURLIndex: map[string]*model.URLFile{
 				"a": {ShortURL: "A"},
 				"b": {ShortURL: "B"},
 			},
-			originalUrl: "C",
+			originalURL: "C",
 			want:        "",
-			wantErr:     errs.ErrOriginalUrlNotFound,
+			wantErr:     errs.ErrOriginalURLNotFound,
 		},
 	}
 
@@ -88,8 +88,8 @@ func TestStorage_GetShortURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s, _ := NewStorage(logger)
-			s.originalUrlIndex = tt.originalUrlIndex
-			got, err := s.GetShortURL(context.Background(), tt.originalUrl)
+			s.originalURLIndex = tt.originalURLIndex
+			got, err := s.GetShortURL(context.Background(), tt.originalURL)
 			assert.Equal(t, tt.want, got)
 			assert.ErrorIs(t, tt.wantErr, err)
 		})

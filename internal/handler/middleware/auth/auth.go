@@ -38,7 +38,7 @@ type UserService interface {
 func WithAuthRequire(key string) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return httperr.Adapt(func(w http.ResponseWriter, r *http.Request) error {
-			userId, err := GetUserID(key, r)
+			userID, err := GetUserID(key, r)
 			var errUserNotFound *ErrUserNotFound
 			if err != nil {
 				if !errors.As(err, &errUserNotFound) {
@@ -53,7 +53,7 @@ func WithAuthRequire(key string) func(http.Handler) http.Handler {
 				return err
 			}
 
-			httpuser.SetUserID(r, userId)
+			httpuser.SetUserID(r, userID)
 
 			h.ServeHTTP(w, r)
 
@@ -67,7 +67,7 @@ func WithAuthRequire(key string) func(http.Handler) http.Handler {
 func WithAuth(key string, userService UserService) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return httperr.Adapt(func(w http.ResponseWriter, r *http.Request) error {
-			userId, err := GetUserID(key, r)
+			userID, err := GetUserID(key, r)
 			var errUserNotFound *ErrUserNotFound
 			if err != nil {
 				if !errors.As(err, &errUserNotFound) {
@@ -78,12 +78,12 @@ func WithAuth(key string, userService UserService) func(http.Handler) http.Handl
 
 			if errUserNotFound != nil {
 				// нет юзера - создаём нового
-				userId, err = userService.CreateUser(r.Context())
+				userID, err = userService.CreateUser(r.Context())
 				if err != nil {
 					return err
 				}
 
-				token, err := CreateJWTToken(key, userId)
+				token, err := CreateJWTToken(key, userID)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return err
@@ -99,7 +99,7 @@ func WithAuth(key string, userService UserService) func(http.Handler) http.Handl
 				http.SetCookie(w, cookie)
 			}
 
-			httpuser.SetUserID(r, userId)
+			httpuser.SetUserID(r, userID)
 
 			h.ServeHTTP(w, r)
 
@@ -119,11 +119,11 @@ func GetUserID(key string, r *http.Request) (int32, error) {
 	}
 	token := cookie.Value
 
-	userId, err := GetUserIDFromJWTToken(key, token)
+	userID, err := GetUserIDFromJWTToken(key, token)
 
 	if err != nil {
 		return 0, NewErrUserNotFound(err, "JWT token parse error")
 	}
 
-	return userId, nil
+	return userID, nil
 }

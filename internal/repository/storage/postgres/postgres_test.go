@@ -17,7 +17,7 @@ import (
 
 func TestStorage_GetURL(t *testing.T) {
 	url := "http://example.com"
-	shortUrl := "abcdef"
+	shortURL := "abcdef"
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -27,16 +27,16 @@ func TestStorage_GetURL(t *testing.T) {
 
 	query := regexp.QuoteMeta("SELECT url, is_deleted FROM url")
 	mock.ExpectPrepare(query)
-	mock.ExpectQuery(query).WithArgs(shortUrl).WillReturnRows(rows)
+	mock.ExpectQuery(query).WithArgs(shortURL).WillReturnRows(rows)
 
 	storage := &Storage{db: db}
-	res, err := storage.GetURL(context.Background(), shortUrl)
+	res, err := storage.GetURL(context.Background(), shortURL)
 	assert.NoError(t, err)
 	assert.Equal(t, url, res)
 }
 
 func TestStorage_GetURL_NotFound(t *testing.T) {
-	shortUrl := "abcdef"
+	shortURL := "abcdef"
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -46,15 +46,15 @@ func TestStorage_GetURL_NotFound(t *testing.T) {
 
 	query := regexp.QuoteMeta("SELECT url, is_deleted FROM url")
 	mock.ExpectPrepare(query)
-	mock.ExpectQuery(query).WithArgs(shortUrl).WillReturnRows(rows)
+	mock.ExpectQuery(query).WithArgs(shortURL).WillReturnRows(rows)
 
 	storage := &Storage{db: db}
-	_, err = storage.GetURL(context.Background(), shortUrl)
-	assert.ErrorIs(t, err, errs.ErrShortUrlGone)
+	_, err = storage.GetURL(context.Background(), shortURL)
+	assert.ErrorIs(t, err, errs.ErrShortURLGone)
 }
 
 func TestStorage_GetURL_Gone(t *testing.T) {
-	shortUrl := "abcdef"
+	shortURL := "abcdef"
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -64,22 +64,22 @@ func TestStorage_GetURL_Gone(t *testing.T) {
 
 	query := regexp.QuoteMeta("SELECT url, is_deleted FROM url")
 	mock.ExpectPrepare(query)
-	mock.ExpectQuery(query).WithArgs(shortUrl).WillReturnRows(rows)
+	mock.ExpectQuery(query).WithArgs(shortURL).WillReturnRows(rows)
 
 	storage := &Storage{db: db}
-	_, err = storage.GetURL(context.Background(), shortUrl)
-	assert.ErrorIs(t, err, errs.ErrShortUrlGone)
+	_, err = storage.GetURL(context.Background(), shortURL)
+	assert.ErrorIs(t, err, errs.ErrShortURLGone)
 }
 
 func TestStorage_GetShortURL(t *testing.T) {
 	url := "http://example.com"
-	shortUrl := "abcdef"
+	shortURL := "abcdef"
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
 
-	rows := sqlmock.NewRows([]string{"short_url", "is_deleted"}).AddRow(shortUrl, false)
+	rows := sqlmock.NewRows([]string{"short_url", "is_deleted"}).AddRow(shortURL, false)
 
 	query := regexp.QuoteMeta("SELECT short_url, is_deleted FROM url")
 	mock.ExpectPrepare(query)
@@ -88,7 +88,7 @@ func TestStorage_GetShortURL(t *testing.T) {
 	storage := &Storage{db: db}
 	res, err := storage.GetShortURL(context.Background(), url)
 	assert.NoError(t, err)
-	assert.Equal(t, shortUrl, res)
+	assert.Equal(t, shortURL, res)
 }
 
 func TestStorage_GetShortURL_NotFound(t *testing.T) {
@@ -107,7 +107,7 @@ func TestStorage_GetShortURL_NotFound(t *testing.T) {
 
 	storage := &Storage{db: db}
 	_, err = storage.GetShortURL(context.Background(), url)
-	assert.ErrorIs(t, err, errs.ErrShortUrlNotFound)
+	assert.ErrorIs(t, err, errs.ErrShortURLNotFound)
 }
 
 func TestStorage_GetShortURL_Gone(t *testing.T) {
@@ -126,7 +126,7 @@ func TestStorage_GetShortURL_Gone(t *testing.T) {
 
 	storage := &Storage{db: db}
 	_, err = storage.GetShortURL(context.Background(), url)
-	assert.ErrorIs(t, err, errs.ErrShortUrlNotFound)
+	assert.ErrorIs(t, err, errs.ErrShortURLNotFound)
 }
 
 func TestStorage_GetUserURL(t *testing.T) {
@@ -171,7 +171,7 @@ func TestStorage_SaveURL(t *testing.T) {
 	userID := int32(123456)
 
 	url := "http://example.com"
-	shortUrl := "abcdef"
+	shortURL := "abcdef"
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -179,10 +179,10 @@ func TestStorage_SaveURL(t *testing.T) {
 
 	query := regexp.QuoteMeta("INSERT INTO url (short_url, url, user_id)")
 	mock.ExpectPrepare(query)
-	mock.ExpectExec(query).WithArgs(shortUrl, url, userID).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(query).WithArgs(shortURL, url, userID).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	storage := &Storage{db: db}
-	err = storage.SaveURL(context.Background(), userID, shortUrl, url)
+	err = storage.SaveURL(context.Background(), userID, shortURL, url)
 	assert.NoError(t, err)
 }
 
@@ -190,7 +190,7 @@ func TestStorage_SaveURL_OriginalURLConflict(t *testing.T) {
 	userID := int32(123456)
 
 	url := "http://example.com"
-	shortUrl := "abcdef"
+	shortURL := "abcdef"
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -198,23 +198,23 @@ func TestStorage_SaveURL_OriginalURLConflict(t *testing.T) {
 
 	retErr := &pgconn.PgError{
 		Code:           pgerrcode.UniqueViolation,
-		ConstraintName: originalUrlConstraintName,
+		ConstraintName: originalURLConstraintName,
 	}
 
 	query := regexp.QuoteMeta("INSERT INTO url (short_url, url, user_id)")
 	mock.ExpectPrepare(query)
-	mock.ExpectExec(query).WithArgs(shortUrl, url, userID).WillReturnError(retErr)
+	mock.ExpectExec(query).WithArgs(shortURL, url, userID).WillReturnError(retErr)
 
 	storage := &Storage{db: db}
-	err = storage.SaveURL(context.Background(), userID, shortUrl, url)
-	assert.ErrorIs(t, err, errs.ErrOriginalUrlAlreadyExists)
+	err = storage.SaveURL(context.Background(), userID, shortURL, url)
+	assert.ErrorIs(t, err, errs.ErrOriginalURLAlreadyExists)
 }
 
 func TestStorage_SaveURL_ShortURLConflict(t *testing.T) {
 	userID := int32(123456)
 
 	url := "http://example.com"
-	shortUrl := "abcdef"
+	shortURL := "abcdef"
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -222,16 +222,16 @@ func TestStorage_SaveURL_ShortURLConflict(t *testing.T) {
 
 	retErr := &pgconn.PgError{
 		Code:           pgerrcode.UniqueViolation,
-		ConstraintName: shortUrlConstraintName,
+		ConstraintName: shortURLConstraintName,
 	}
 
 	query := regexp.QuoteMeta("INSERT INTO url (short_url, url, user_id)")
 	mock.ExpectPrepare(query)
-	mock.ExpectExec(query).WithArgs(shortUrl, url, userID).WillReturnError(retErr)
+	mock.ExpectExec(query).WithArgs(shortURL, url, userID).WillReturnError(retErr)
 
 	storage := &Storage{db: db}
-	err = storage.SaveURL(context.Background(), userID, shortUrl, url)
-	assert.ErrorIs(t, err, errs.ErrShortUrlAlreadyExists)
+	err = storage.SaveURL(context.Background(), userID, shortURL, url)
+	assert.ErrorIs(t, err, errs.ErrShortURLAlreadyExists)
 }
 
 func TestStorage_SaveURLBatch(t *testing.T) {
@@ -255,7 +255,7 @@ func TestStorage_SaveURLBatch(t *testing.T) {
 		},
 	}
 
-	expectedUrls := []model.URL{
+	expectedURLs := []model.URL{
 		{
 			ShortURL:    "a",
 			OriginalURL: "http://a.com",
@@ -296,12 +296,12 @@ func TestStorage_SaveURLBatch(t *testing.T) {
 	storage := &Storage{db: db}
 	err = storage.SaveURLBatch(context.Background(), userID, urls)
 	assert.NoError(t, err)
-	assert.Equal(t, expectedUrls, urls)
+	assert.Equal(t, expectedURLs, urls)
 }
 
 func TestStorage_SoftDeleteURLBatch(t *testing.T) {
 	userID := int32(123456)
-	shortUrls := []string{"a", "b", "c", "d"}
+	shortURLs := []string{"a", "b", "c", "d"}
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -317,12 +317,12 @@ func TestStorage_SoftDeleteURLBatch(t *testing.T) {
 	mock.ExpectCommit()
 
 	storage := &Storage{db: db}
-	err = storage.SoftDeleteURLBatch(context.Background(), userID, shortUrls)
+	err = storage.SoftDeleteURLBatch(context.Background(), userID, shortURLs)
 	assert.NoError(t, err)
 }
 
 func TestStorage_PurgeURLBatch(t *testing.T) {
-	shortUrls := []string{"a", "b", "c", "d"}
+	shortURLs := []string{"a", "b", "c", "d"}
 
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -338,6 +338,6 @@ func TestStorage_PurgeURLBatch(t *testing.T) {
 	mock.ExpectCommit()
 
 	storage := &Storage{db: db}
-	err = storage.PurgeURLBatch(context.Background(), shortUrls)
+	err = storage.PurgeURLBatch(context.Background(), shortURLs)
 	assert.NoError(t, err)
 }

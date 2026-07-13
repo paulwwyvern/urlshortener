@@ -4,13 +4,13 @@ import (
 	"errors"
 )
 
-var ErrShortUrlNotFound = errors.New("short url not found")
-var ErrShortUrlGone = errors.New("short url gone")
-var ErrOriginalUrlNotFound = errors.New("original url not found")
+var ErrShortURLNotFound = errors.New("short url not found")
+var ErrShortURLGone = errors.New("short url gone")
+var ErrOriginalURLNotFound = errors.New("original url not found")
 
-var ErrShortUrlAlreadyExists = errors.New("short url already exists")
-var ErrOriginalUrlAlreadyExists = errors.New("original url already exists")
+var ErrShortURLAlreadyExists = errors.New("short url already exists")
+var ErrOriginalURLAlreadyExists = errors.New("original url already exists")
 
 //var ErrInternalError = errors.New("internal error")
 
-var ErrShortUrlForbidden = errors.New("short url forbidden")
+var ErrShortURLForbidden = errors.New("short url forbidden")

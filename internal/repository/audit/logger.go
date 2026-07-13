@@ -21,7 +21,7 @@ func NewAuditLogLogger(logger *zap.Logger) *LogLogger {
 func (a *LogLogger) Update(event *model.AuditEvent) error {
 	str, err := json.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("Audit log logger: failed to marshal audit event: %w ", err)
+		return fmt.Errorf("audit log logger: failed to marshal audit event: %w ", err)
 	}
 	a.logger.Info("Get audit event", zap.String("event", string(str)))
 

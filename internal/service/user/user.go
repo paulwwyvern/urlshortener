@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+
 	"go.uber.org/zap"
 )
 
@@ -26,10 +27,10 @@ func NewService(logger *zap.Logger, userRepo UserRepository) *UserService {
 }
 
 func (s *UserService) CreateUser(ctx context.Context) (int32, error) {
-	userId, err := s.userRepo.CreateUser(ctx)
+	userID, err := s.userRepo.CreateUser(ctx)
 	if err != nil {
 		return 0, err
 	}
-	s.logger.Info("Created user", zap.Int32("userId", userId))
-	return userId, nil
+	s.logger.Info("Created user", zap.Int32("userId", userID))
+	return userID, nil
 }

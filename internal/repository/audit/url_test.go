@@ -37,7 +37,7 @@ func TestLogUrl_Update(t *testing.T) {
 	}))
 	defer server.Close()
 
-	auditLog := NewAuditLogUrl(url)
+	auditLog := NewAuditLogURL(url)
 	auditLog.client = server.Client()
 
 	err := auditLog.Update(&event)

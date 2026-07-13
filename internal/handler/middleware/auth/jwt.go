@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+
 	"github.com/golang-jwt/jwt/v4"
 )
 
@@ -29,7 +30,7 @@ func GetUserIDFromJWTToken(key string, tokenString string) (int32, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", t.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing method: %v ", t.Header["alg"])
 		}
 		return []byte(key), nil
 	})

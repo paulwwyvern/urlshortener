@@ -13,53 +13,53 @@ import (
 type Storage struct {
 	mu sync.RWMutex
 
-	shortUrlIndex    map[string]*model.URLFile
-	originalUrlIndex map[string]*model.URLFile
+	shortURLIndex    map[string]*model.URLFile
+	originalURLIndex map[string]*model.URLFile
 	userIDIndex      map[int32]map[*model.URLFile]struct{}
 }
 
 func NewStorage(logger *zap.Logger) (*Storage, error) {
 	logger.Info("Initializing in-memory storage")
 	return &Storage{
-		shortUrlIndex:    make(map[string]*model.URLFile),
-		originalUrlIndex: make(map[string]*model.URLFile),
+		shortURLIndex:    make(map[string]*model.URLFile),
+		originalURLIndex: make(map[string]*model.URLFile),
 		userIDIndex:      make(map[int32]map[*model.URLFile]struct{}),
 	}, nil
 }
 
 func (s *Storage) GetAllURLs() map[string]*model.URLFile {
-	return s.shortUrlIndex
+	return s.shortURLIndex
 }
 
-func (s *Storage) GetURL(_ context.Context, shortUrl string) (string, error) {
+func (s *Storage) GetURL(_ context.Context, shortURL string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	url, ok := s.shortUrlIndex[shortUrl]
+	url, ok := s.shortURLIndex[shortURL]
 	if !ok {
-		return "", errs.ErrShortUrlNotFound
+		return "", errs.ErrShortURLNotFound
 	}
 
 	return url.OriginalURL, nil
 }
 
-func (s *Storage) GetShortURL(_ context.Context, originalUrl string) (string, error) {
+func (s *Storage) GetShortURL(_ context.Context, originalURL string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	url, ok := s.originalUrlIndex[originalUrl]
+	url, ok := s.originalURLIndex[originalURL]
 	if !ok {
-		return "", errs.ErrOriginalUrlNotFound
+		return "", errs.ErrOriginalURLNotFound
 	}
 
 	return url.ShortURL, nil
 }
 
-func (s *Storage) GetUserURL(_ context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
+func (s *Storage) GetUserURL(_ context.Context, userID int32) ([]dto.GetUserURLResponse, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	set := s.userIDIndex[userId]
+	set := s.userIDIndex[userID]
 
 	userURLs := make([]dto.GetUserURLResponse, 0, len(set))
 	for url := range set {
@@ -72,26 +72,26 @@ func (s *Storage) GetUserURL(_ context.Context, userId int32) ([]dto.GetUserURLR
 	return userURLs, nil
 }
 
-func (s *Storage) SaveURL(_ context.Context, userID int32, shortUrl string, originalUrl string) error {
+func (s *Storage) SaveURL(_ context.Context, userID int32, shortURL string, originalURL string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, ok := s.originalUrlIndex[originalUrl]
+	_, ok := s.originalURLIndex[originalURL]
 	if ok {
-		return errs.ErrOriginalUrlAlreadyExists
+		return errs.ErrOriginalURLAlreadyExists
 	}
-	_, ok = s.shortUrlIndex[shortUrl]
+	_, ok = s.shortURLIndex[shortURL]
 	if ok {
-		return errs.ErrShortUrlAlreadyExists
+		return errs.ErrShortURLAlreadyExists
 	}
 
 	url := &model.URLFile{
-		OriginalURL: originalUrl,
-		ShortURL:    shortUrl,
+		OriginalURL: originalURL,
+		ShortURL:    shortURL,
 		UserID:      userID,
 	}
 
-	s.shortUrlIndex[shortUrl] = url
-	s.originalUrlIndex[originalUrl] = url
+	s.shortURLIndex[shortURL] = url
+	s.originalURLIndex[originalURL] = url
 
 	if s.userIDIndex[userID] == nil {
 		s.userIDIndex[userID] = make(map[*model.URLFile]struct{})
@@ -106,13 +106,13 @@ func (s *Storage) SaveURLBatch(ctx context.Context, userID int32, urls []model.U
 	defer s.mu.Unlock()
 
 	for i, url := range urls {
-		_, ok := s.shortUrlIndex[url.ShortURL]
+		_, ok := s.shortURLIndex[url.ShortURL]
 		if ok {
-			return errs.ErrShortUrlAlreadyExists
+			return errs.ErrShortURLAlreadyExists
 		}
-		_, ok = s.originalUrlIndex[url.OriginalURL]
+		_, ok = s.originalURLIndex[url.OriginalURL]
 		if ok {
-			url.ShortURL = s.originalUrlIndex[url.OriginalURL].ShortURL
+			url.ShortURL = s.originalURLIndex[url.OriginalURL].ShortURL
 			url.IsExist = true
 			urls[i] = url
 		}
@@ -123,49 +123,49 @@ func (s *Storage) SaveURLBatch(ctx context.Context, userID int32, urls []model.U
 			continue
 		}
 
-		_, ok := s.originalUrlIndex[url.OriginalURL]
+		_, ok := s.originalURLIndex[url.OriginalURL]
 		if ok {
 			continue
 		}
 
-		saveUrl := &model.URLFile{
+		saveURL := &model.URLFile{
 			OriginalURL: url.OriginalURL,
 			ShortURL:    url.ShortURL,
 			UserID:      userID,
 		}
 
-		s.shortUrlIndex[url.ShortURL] = saveUrl
-		s.originalUrlIndex[url.OriginalURL] = saveUrl
+		s.shortURLIndex[url.ShortURL] = saveURL
+		s.originalURLIndex[url.OriginalURL] = saveURL
 
 		if s.userIDIndex[userID] == nil {
 			s.userIDIndex[userID] = make(map[*model.URLFile]struct{})
 		}
-		s.userIDIndex[userID][saveUrl] = struct{}{}
+		s.userIDIndex[userID][saveURL] = struct{}{}
 	}
 
 	return nil
 }
 
-func (s *Storage) SoftDeleteURLBatch(_ context.Context, userId int32, shortUrls []string) error {
+func (s *Storage) SoftDeleteURLBatch(_ context.Context, userID int32, shortURLs []string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, shortUrl := range shortUrls {
-		url, ok := s.shortUrlIndex[shortUrl]
+	for _, shortURL := range shortURLs {
+		url, ok := s.shortURLIndex[shortURL]
 		if !ok {
-			return errs.ErrShortUrlNotFound
+			return errs.ErrShortURLNotFound
 		}
 
-		if url.UserID != userId {
-			return errs.ErrShortUrlForbidden
+		if url.UserID != userID {
+			return errs.ErrShortURLForbidden
 		}
 	}
 
-	for _, shortUrl := range shortUrls {
-		url := s.shortUrlIndex[shortUrl]
-		delete(s.shortUrlIndex, url.ShortURL)
-		delete(s.originalUrlIndex, url.OriginalURL)
-		if set, ok := s.userIDIndex[userId]; ok {
+	for _, shortURL := range shortURLs {
+		url := s.shortURLIndex[shortURL]
+		delete(s.shortURLIndex, url.ShortURL)
+		delete(s.originalURLIndex, url.OriginalURL)
+		if set, ok := s.userIDIndex[userID]; ok {
 			delete(set, url)
 		}
 	}

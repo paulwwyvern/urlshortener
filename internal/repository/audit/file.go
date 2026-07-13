@@ -31,7 +31,7 @@ func NewAuditLogFile(file string) (*LogFile, error) {
 func (a *LogFile) Update(event *model.AuditEvent) error {
 	err := a.encoder.Encode(event)
 	if err != nil {
-		return fmt.Errorf("Audit log file error: %w ", err)
+		return fmt.Errorf("audit log file error: %w ", err)
 	}
 	return nil
 }

@@ -18,10 +18,10 @@ import (
 
 type ShortenerService interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
-	GetUserURLs(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error)
-	GenerateURL(ctx context.Context, userId int32, url string) (string, error)
-	GenerateURLBatch(ctx context.Context, userId int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error)
-	DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error
+	GetUserURLs(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error)
+	GenerateURL(ctx context.Context, userID int32, url string) (string, error)
+	GenerateURLBatch(ctx context.Context, userID int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error)
+	DeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
 	Ping(ctx context.Context) error
 }
 
@@ -75,7 +75,7 @@ func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 	shortURL, err := h.service.GenerateURL(ctx, userID, url)
 	w.Header().Set("Content-Type", "text/plain")
 	if err != nil {
-		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
+		if errors.Is(err, errs.ErrOriginalURLAlreadyExists) {
 			w.WriteHeader(http.StatusConflict)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -113,9 +113,9 @@ func (h *Handler) getURL(w http.ResponseWriter, r *http.Request) error {
 
 	url, err := h.service.GetURL(ctx, shortURL)
 	if err != nil {
-		if errors.Is(err, errs.ErrShortUrlNotFound) {
+		if errors.Is(err, errs.ErrShortURLNotFound) {
 			w.WriteHeader(http.StatusNotFound)
-		} else if errors.Is(err, errs.ErrShortUrlGone) {
+		} else if errors.Is(err, errs.ErrShortURLGone) {
 			w.WriteHeader(http.StatusGone)
 		} else {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -210,7 +210,7 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 	url, err := h.service.GenerateURL(ctx, userID, req.URL)
 
 	if err != nil {
-		if errors.Is(err, errs.ErrOriginalUrlAlreadyExists) {
+		if errors.Is(err, errs.ErrOriginalURLAlreadyExists) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
 		} else {

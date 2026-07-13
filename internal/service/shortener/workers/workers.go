@@ -3,10 +3,11 @@ package workers
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type PurgeURLRepository interface {
@@ -16,7 +17,7 @@ type PurgeURLRepository interface {
 type PurgeWorker struct {
 	logger *zap.Logger
 
-	workerId int
+	workerID int
 
 	batchSize int
 	batch     []string
@@ -41,11 +42,11 @@ type PurgeWorkerConfig struct {
 	InputChan <-chan string
 }
 
-func NewPurgeWorker(logger *zap.Logger, workerId int, config PurgeWorkerConfig) *PurgeWorker {
+func NewPurgeWorker(logger *zap.Logger, workerID int, config PurgeWorkerConfig) *PurgeWorker {
 	w := &PurgeWorker{
 		logger: logger,
 
-		workerId: workerId,
+		workerID: workerID,
 
 		batchSize: config.BatchSize,
 		batch:     make([]string, 0, config.BatchSize),
@@ -99,12 +100,12 @@ func (w *PurgeWorker) Flush() {
 
 	err := w.urlRepo.PurgeURLBatch(context.Background(), w.batch)
 	if err != nil {
-		w.errCh <- fmt.Errorf("PurgeWorker #%d Flush: %w", w.workerId, err)
+		w.errCh <- fmt.Errorf("PurgeWorker #%d Flush: %w", w.workerID, err)
 		return
 	}
 
 	w.logger.Info("Purge worker flushed",
-		zap.Int("workerId", w.workerId),
+		zap.Int("workerID", w.workerID),
 		zap.Int("count", len(w.batch)),
 		zap.String("urls", strings.Join(w.batch, ",")),
 	)

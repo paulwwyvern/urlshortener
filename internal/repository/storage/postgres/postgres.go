@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	shortUrlConstraintName    = "short_url_unique"
-	originalUrlConstraintName = "url_unique"
+	shortURLConstraintName    = "short_url_unique"
+	originalURLConstraintName = "url_unique"
 )
 
 // Storage позволяет взаимодействовать с бд postgres
@@ -71,7 +71,7 @@ func Migrate(source string, dsn string) error {
 }
 
 // GetURL достаёт из бд оригинальный урл по его короткому урлу
-func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
+func (s *Storage) GetURL(ctx context.Context, shortURL string) (string, error) {
 	stmt, err := s.db.PrepareContext(ctx, `SELECT url, is_deleted FROM url WHERE short_url = $1`)
 	if err != nil {
 		return "", fmt.Errorf("GetURL: failed to prepare query: %w", err)
@@ -80,16 +80,16 @@ func (s *Storage) GetURL(ctx context.Context, shortUrl string) (string, error) {
 
 	var url string
 	var isDeleted bool
-	err = stmt.QueryRowContext(ctx, shortUrl).Scan(&url, &isDeleted)
+	err = stmt.QueryRowContext(ctx, shortURL).Scan(&url, &isDeleted)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", errs.ErrShortUrlGone
+			return "", errs.ErrShortURLGone
 		} else {
 			return "", fmt.Errorf("GetURL: failed to get url: %w", err)
 		}
 	}
 	if isDeleted {
-		return "", errs.ErrShortUrlGone
+		return "", errs.ErrShortURLGone
 	}
 	return url, nil
 }
@@ -102,21 +102,21 @@ func (s *Storage) GetShortURL(ctx context.Context, url string) (string, error) {
 	}
 	defer stmt.Close()
 
-	var shortUrl string
+	var shortURL string
 	var isDeleted bool
-	err = stmt.QueryRowContext(ctx, url).Scan(&shortUrl, &isDeleted)
+	err = stmt.QueryRowContext(ctx, url).Scan(&shortURL, &isDeleted)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", errs.ErrShortUrlNotFound
+			return "", errs.ErrShortURLNotFound
 		} else {
 			return "", fmt.Errorf("GetShortURL: failed to get url: %w", err)
 		}
 	}
 	if isDeleted {
-		return "", errs.ErrShortUrlNotFound
+		return "", errs.ErrShortURLNotFound
 	}
 
-	return shortUrl, nil
+	return shortURL, nil
 }
 
 // GetUserURL достаёт из бд все урлы, созданные конкретным пользователем
@@ -134,10 +134,10 @@ func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserUR
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var shortUrl string
+		var shortURL string
 		var url string
 		var isDeleted bool
-		err = rows.Scan(&shortUrl, &url, &isDeleted)
+		err = rows.Scan(&shortURL, &url, &isDeleted)
 		if err != nil {
 			return nil, fmt.Errorf("GetUserURL: failed to scan row: %w", err)
 		}
@@ -146,7 +146,7 @@ func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserUR
 		}
 
 		userURL = append(userURL, dto.GetUserURLResponse{
-			ShortURL:    shortUrl,
+			ShortURL:    shortURL,
 			OriginalURL: url,
 		})
 	}
@@ -158,24 +158,27 @@ func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserUR
 }
 
 // SaveURL сохраняет в бд новый урл, созданный пользователем
-func (s *Storage) SaveURL(ctx context.Context, userID int32, shortUrl string, originalUrl string) error {
+func (s *Storage) SaveURL(ctx context.Context, userID int32, shortURL string, originalURL string) error {
 	stmt, err := s.db.PrepareContext(ctx, `INSERT INTO url (short_url, url, user_id) VALUES ($1, $2, $3)`)
 	if err != nil {
 		return fmt.Errorf("SaveURL: failed to prepare query: %w", err)
 	}
 	defer stmt.Close()
 
-	_, err = stmt.ExecContext(ctx, shortUrl, originalUrl, userID)
+	_, err = stmt.ExecContext(ctx, shortURL, originalURL, userID)
 	if err != nil {
 		var pgxErr *pgconn.PgError
 		if errors.As(err, &pgxErr) {
 			if pgxErr.Code == pgerrcode.UniqueViolation {
-				if pgxErr.ConstraintName == originalUrlConstraintName {
+				switch pgxErr.ConstraintName {
+				case originalURLConstraintName:
 					// коллизия по url
-					return errs.ErrOriginalUrlAlreadyExists
-				} else if pgxErr.ConstraintName == shortUrlConstraintName {
+
+					return errs.ErrOriginalURLAlreadyExists
+				case shortURLConstraintName:
 					// коллизия по short url
-					return errs.ErrShortUrlAlreadyExists
+
+					return errs.ErrShortURLAlreadyExists
 				}
 			}
 		}
@@ -188,7 +191,7 @@ func (s *Storage) SaveURL(ctx context.Context, userID int32, shortUrl string, or
 //
 // Так же если некоторые из оригинальных урлов уже существуют, то в urls они будут помечены
 // и их короткие урлы будут заменены на урлы из бд
-func (s *Storage) SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error {
+func (s *Storage) SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error {
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -207,17 +210,17 @@ func (s *Storage) SaveURLBatch(ctx context.Context, userId int32, urls []model.U
 
 	for i, url := range urls {
 
-		var shortUrl string
+		var shortURL string
 		var isExist bool
-		err = stmt.QueryRowContext(ctx, url.ShortURL, url.OriginalURL, userId).Scan(&shortUrl, &isExist)
+		err = stmt.QueryRowContext(ctx, url.ShortURL, url.OriginalURL, userID).Scan(&shortURL, &isExist)
 
 		if err != nil {
 			var pgxErr *pgconn.PgError
 			if errors.As(err, &pgxErr) {
 				if pgxErr.Code == pgerrcode.UniqueViolation {
-					if pgxErr.ConstraintName == shortUrlConstraintName {
+					if pgxErr.ConstraintName == shortURLConstraintName {
 						// коллизия по short url
-						return errs.ErrShortUrlAlreadyExists
+						return errs.ErrShortURLAlreadyExists
 					}
 				}
 			}
@@ -225,7 +228,7 @@ func (s *Storage) SaveURLBatch(ctx context.Context, userId int32, urls []model.U
 		}
 
 		if isExist {
-			url.ShortURL = shortUrl
+			url.ShortURL = shortURL
 			url.IsExist = true
 			urls[i] = url
 			continue
@@ -240,7 +243,7 @@ func (s *Storage) SaveURLBatch(ctx context.Context, userId int32, urls []model.U
 }
 
 // SoftDeleteURLBatch помечает указанные урлы в бд, как удалённые, но физически пока не удаляет
-func (s *Storage) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error {
+func (s *Storage) SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("SoftDeleteURLBatch: failed to begin transaction: %w", err)
@@ -253,8 +256,8 @@ func (s *Storage) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrl
 	}
 	defer stmt.Close()
 
-	for _, shortUrl := range shortUrls {
-		_, err = stmt.ExecContext(ctx, shortUrl, userId)
+	for _, shortURL := range shortURLs {
+		_, err = stmt.ExecContext(ctx, shortURL, userID)
 		if err != nil {
 			return fmt.Errorf("SoftDeleteURLBatch: failed to soft delete url: %w", err)
 		}
@@ -280,8 +283,8 @@ func (s *Storage) PurgeURLBatch(ctx context.Context, urls []string) error {
 	}
 	defer stmt.Close()
 
-	for _, shortUrl := range urls {
-		_, err = stmt.ExecContext(ctx, shortUrl)
+	for _, shortURL := range urls {
+		_, err = stmt.ExecContext(ctx, shortURL)
 		if err != nil {
 			return fmt.Errorf("PurgeURLBatch: failed to purge url: %w", err)
 		}

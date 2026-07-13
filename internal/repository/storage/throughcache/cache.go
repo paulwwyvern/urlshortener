@@ -7,13 +7,13 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/model/dto"
 )
 
-type UrlRepository interface {
-	GetURL(ctx context.Context, shortUrl string) (string, error)
+type URLRepository interface {
+	GetURL(ctx context.Context, shortURL string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
-	GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error)
-	SaveURL(ctx context.Context, userId int32, shortUrl string, url string) error
-	SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error
-	SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error
+	GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error)
+	SaveURL(ctx context.Context, userID int32, shortURL string, url string) error
+	SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error
+	SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
 	PurgeURLBatch(ctx context.Context, urls []string) error
 	Ping(context.Context) error
 	Close() error
@@ -25,32 +25,32 @@ type CacheRepository interface {
 	Delete(string)
 }
 
-// Cache реализует механизм сквозного кэширования, когда все запросы к репозиторию UrlRepository
+// Cache реализует механизм сквозного кэширования, когда все запросы к репозиторию URLRepository
 // проходят через Cache, который пытается достать данные из CacheRepository и если их там нет,
-// то подгружает их из UrlRepository
+// то подгружает их из URLRepository
 type Cache struct {
 	cache CacheRepository
-	repo  UrlRepository
+	repo  URLRepository
 }
 
-func NewCache(cache CacheRepository, repo UrlRepository) *Cache {
+func NewCache(cache CacheRepository, repo URLRepository) *Cache {
 	return &Cache{
 		cache: cache,
 		repo:  repo,
 	}
 }
 
-func (c *Cache) GetURL(ctx context.Context, shortUrl string) (string, error) {
-	url, ok := c.cache.Get(shortUrl)
+func (c *Cache) GetURL(ctx context.Context, shortURL string) (string, error) {
+	url, ok := c.cache.Get(shortURL)
 	if ok {
 		return url, nil
 	}
 
-	url, err := c.repo.GetURL(ctx, shortUrl)
+	url, err := c.repo.GetURL(ctx, shortURL)
 	if err != nil {
 		return "", err
 	}
-	c.cache.Put(shortUrl, url)
+	c.cache.Put(shortURL, url)
 
 	return url, nil
 }
@@ -59,22 +59,22 @@ func (c *Cache) GetShortURL(ctx context.Context, url string) (string, error) {
 	return c.repo.GetShortURL(ctx, url)
 }
 
-func (c *Cache) GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
-	return c.repo.GetUserURL(ctx, userId)
+func (c *Cache) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error) {
+	return c.repo.GetUserURL(ctx, userID)
 }
 
-func (c *Cache) SaveURL(ctx context.Context, userId int32, shortUrl string, url string) error {
-	err := c.repo.SaveURL(ctx, userId, shortUrl, url)
+func (c *Cache) SaveURL(ctx context.Context, userID int32, shortURL string, url string) error {
+	err := c.repo.SaveURL(ctx, userID, shortURL, url)
 	if err != nil {
 		return err
 	}
 
-	c.cache.Put(shortUrl, url)
+	c.cache.Put(shortURL, url)
 	return nil
 }
 
-func (c *Cache) SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error {
-	err := c.repo.SaveURLBatch(ctx, userId, urls)
+func (c *Cache) SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error {
+	err := c.repo.SaveURLBatch(ctx, userID, urls)
 	if err != nil {
 		return err
 	}
@@ -85,14 +85,14 @@ func (c *Cache) SaveURLBatch(ctx context.Context, userId int32, urls []model.URL
 	return nil
 }
 
-func (c *Cache) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error {
-	err := c.repo.SoftDeleteURLBatch(ctx, userId, shortUrls)
+func (c *Cache) SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error {
+	err := c.repo.SoftDeleteURLBatch(ctx, userID, shortURLs)
 	if err != nil {
 		return err
 	}
 
-	for _, shortUrl := range shortUrls {
-		c.cache.Delete(shortUrl)
+	for _, shortURL := range shortURLs {
+		c.cache.Delete(shortURL)
 	}
 
 	return nil

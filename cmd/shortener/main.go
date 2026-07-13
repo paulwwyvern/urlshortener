@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -37,8 +36,8 @@ import (
 )
 
 const (
-	shortUrlLen     = 10
-	shortUrlGenSeed = 42
+	shortURLLen     = 10
+	shortURLGenSeed = 42
 
 	batchSize = 10
 
@@ -61,13 +60,13 @@ const (
 	cacheCapacity = 10
 )
 
-type UrlRepository interface {
-	GetURL(ctx context.Context, shortUrl string) (string, error)
+type URLRepository interface {
+	GetURL(ctx context.Context, shortURL string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
-	GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error)
-	SaveURL(ctx context.Context, userId int32, shortUrl string, url string) error
-	SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error
-	SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error
+	GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error)
+	SaveURL(ctx context.Context, userID int32, shortURL string, url string) error
+	SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error
+	SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
 	PurgeURLBatch(ctx context.Context, urls []string) error
 	Ping(context.Context) error
 	Close() error
@@ -91,20 +90,20 @@ func main() {
 	if err != nil {
 		if !errors.Is(err, config.ErrConfigFileNotFound) {
 			logger.Fatal("failed to parse config", zap.Error(err))
-			os.Exit(1)
+			panic("failed to parse config")
 		}
 		logger.Info("no config file found")
 	}
 	logger.Info("Service config",
 		zap.String("config_path", conf.ConfigPath),
 		zap.String("server_address", conf.ServerAddress),
-		zap.String("base_url", conf.BaseUrl),
+		zap.String("base_url", conf.BaseURL),
 		zap.String("file_storage_path", conf.FileStoragePath),
 		zap.String("database_dsn", conf.DatabaseDsn),
 	)
 
 	// init repo
-	var repo UrlRepository
+	var repo URLRepository
 	if conf.DatabaseDsn != "" {
 		cache := lrucache.NewLRUCache[string, string](cacheCapacity)
 		storage, err := postgres.NewStorage(logger, conf.DatabaseDsn, true, migrationSource)
@@ -133,15 +132,15 @@ func main() {
 	// init generator
 	generator := strgenerator.NewGenerator(
 		strgenerator.Digits+strgenerator.UppercaseLatin+strgenerator.LowercaseLatin,
-		shortUrlLen,
-		shortUrlGenSeed,
+		shortURLLen,
+		shortURLGenSeed,
 	)
 
 	logger.Info("Init random generator")
 
 	// init service
 	shortenerServiceConfig := shortener.ShortenerServiceConfig{
-		BaseUrl:           conf.BaseUrl,
+		BaseURL:           conf.BaseURL,
 		BatchSize:         batchSize,
 		URLRepository:     repo,
 		URLGenerator:      generator,
@@ -182,10 +181,10 @@ func main() {
 		}
 	}
 
-	if conf.AuditUrl != "" {
+	if conf.AuditURL != "" {
 		logger.Info("Init audit log url service")
 
-		auditSub := auditlog.NewAuditLogUrl(conf.AuditUrl)
+		auditSub := auditlog.NewAuditLogURL(conf.AuditURL)
 
 		auditPub.Register(auditSub)
 		defer auditSub.Close()
@@ -247,7 +246,7 @@ func main() {
 	select {
 	case err := <-servErr:
 		logger.Fatal("failed to start server", zap.Error(err))
-		os.Exit(1)
+		panic("failed to start server")
 	case <-ctx.Done():
 		stop()
 		logger.Info("shutdown signal received")
