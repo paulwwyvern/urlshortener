@@ -28,3 +28,4 @@ vendor/
 /check_coverage.sh
 /migrate.sh
 /cmd/staticlint/staticlint
+/cmd/reset/testdir/reset.gen.go

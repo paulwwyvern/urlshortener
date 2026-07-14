@@ -36,6 +36,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				// Проверяем что вызванная функция это os.Exit
 				if isExitCall(n) {
 					pass.Reportf(n.Pos(), "call os.Exit function")
+					return false
 				}
 			}
 			return true
