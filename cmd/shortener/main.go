@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -34,6 +35,10 @@ import (
 	"github.com/paulwwyvern/urlshortener/pkg/strgenerator"
 	"go.uber.org/zap"
 )
+
+var buildVersion string
+var buildDate string
+var buildCommit string
 
 const (
 	shortURLLen     = 10
@@ -73,6 +78,20 @@ type URLRepository interface {
 }
 
 func main() {
+
+	if buildVersion == "" {
+		buildVersion = "N/A"
+	}
+	if buildDate == "" {
+		buildDate = "N/A"
+	}
+	if buildCommit == "" {
+		buildCommit = "N/A"
+	}
+
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 
 	// init context
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
