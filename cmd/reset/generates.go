@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"go/ast"
 	"go/format"
+	"go/types"
 	"text/template"
 )
 
@@ -33,6 +34,7 @@ const (
 	typeFile int = iota
 	typeVar
 	typeSlice
+	typeArray
 	typeMap
 	typeStruct
 	typePointer
@@ -57,6 +59,8 @@ const templateVar = `{{.name}} = {{.zero}}`
 
 const templateSlice = `{{.name}} = {{.name}}[:0]`
 
+const templateArray = `{{.name}} = {{.type}}{}`
+
 const templateMap = `clear({{.name}})`
 
 const templateStruct = `if resetter, ok := interface{}({{.name}}).(interface{ Reset() }); ok {
@@ -76,6 +80,7 @@ func NewGenerator() *Generator {
 		typeFile:    template.Must(template.New("").Parse(templateFile)),
 		typeVar:     template.Must(template.New("").Parse(templateVar)),
 		typeSlice:   template.Must(template.New("").Parse(templateSlice)),
+		typeArray:   template.Must(template.New("").Parse(templateArray)),
 		typeMap:     template.Must(template.New("").Parse(templateMap)),
 		typeStruct:  template.Must(template.New("").Parse(templateStruct)),
 		typePointer: template.Must(template.New("").Parse(templatePointer)),
@@ -95,13 +100,16 @@ func (g *Generator) GenerateFile(p *PackageData) []byte {
 }
 
 // GenerateNullifyField генерит то как будет обнулятся name в зависимости от того, что за тип спрятан под e
-func (g *Generator) GenerateNullifyField(structName string, name string, e ast.Expr) string {
-	return g.generateNullifyField(structName+"."+name, e)
+func (g *Generator) GenerateNullifyField(structName string, name string, e ast.Expr) (string, error) {
+	_, s, err := g.generateNullifyField(structName+"."+name, e)
+	return s, err
 }
 
-func (g *Generator) generateNullifyField(name string, e ast.Expr) string {
+func (g *Generator) generateNullifyField(name string, e ast.Expr) (int, string, error) {
 	var buf bytes.Buffer
-	var t *template.Template
+	var tmp *template.Template
+	var t int
+
 	data := map[string]string{
 		"name": name,
 	}
@@ -113,36 +121,60 @@ func (g *Generator) generateNullifyField(name string, e ast.Expr) string {
 		if ok {
 			data["zero"] = zeroVal
 
-			t = g.templates[typeVar]
+			t = typeVar
+			tmp = g.templates[typeVar]
 		} else {
-			t = g.templates[typeStruct]
+			t = typeStruct
+			tmp = g.templates[typeStruct]
 		}
 	case *ast.SelectorExpr:
 		// тут попадаются структуры из другого пакета
-		t = g.templates[typeStruct]
+		t = typeStruct
+		tmp = g.templates[typeStruct]
 	case *ast.StarExpr:
 		// тут ссылки
-		body := g.generateNullifyField("*"+name, e.X)
+		tbody, body, err := g.generateNullifyField("*"+name, e.X)
+		if err != nil {
+			return 0, "", err
+		}
+		if tbody == typeStruct {
+			// внутри ссылки структура, значит пересоздадим без разыменования
+			_, body, err = g.generateNullifyField(name, e.X)
+			if err != nil {
+				return 0, "", err
+			}
+		}
+
 		data["body"] = body
 
-		t = g.templates[typePointer]
-	case *ast.SliceExpr:
-		// тут слайсы
-		t = g.templates[typeSlice]
+		t = typePointer
+		tmp = g.templates[typePointer]
 	case *ast.ArrayType:
 		// тут массив
-		t = g.templates[typeSlice]
+		if e.Len != nil {
+			// массив
+			data["type"] = types.ExprString(e)
+
+			t = typeArray
+			tmp = g.templates[typeArray]
+		} else {
+			// слайс
+			t = typeSlice
+			tmp = g.templates[typeSlice]
+		}
 	case *ast.MapType:
 		// тут мапы
-		t = g.templates[typeMap]
+		t = typeMap
+		tmp = g.templates[typeMap]
 	default:
 		// тут всё остальное что не было учтено
-		t = g.templates[typeStruct]
+		t = typeStruct
+		tmp = g.templates[typeStruct]
 	}
 
-	err := t.Execute(&buf, data)
+	err := tmp.Execute(&buf, data)
 	if err != nil {
-		panic(err)
+		return 0, "", err
 	}
-	return buf.String()
+	return t, buf.String(), nil
 }

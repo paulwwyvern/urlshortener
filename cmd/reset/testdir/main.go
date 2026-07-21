@@ -10,8 +10,9 @@ type ResetableStruct struct {
 	str  string
 	strP *string
 	s    []int
-	m    map[string]string
-	r    Reseter
+	a    [10]int
+	m    *map[string]string
+	r    ***ResetableStruct
 }
 
 func main() {

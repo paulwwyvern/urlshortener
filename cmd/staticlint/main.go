@@ -43,7 +43,7 @@ import (
 
 	"honnef.co/go/tools/staticcheck"
 
-	"staticlint/noexit"
+	"github.com/paulwwyvern/urlshortener/cmd/staticlint/noexit"
 )
 
 func main() {
@@ -114,8 +114,7 @@ func main() {
 	mychecks = append(mychecks, staticChecks...)
 	mychecks = append(mychecks, vetChecks...)
 
-	var noexitCheck *analysis.Analyzer
-	noexitCheck = noexit.Analyzer
+	var noexitCheck = noexit.Analyzer
 
 	mychecks = append(mychecks, noexitCheck)
 

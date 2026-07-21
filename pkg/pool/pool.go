@@ -21,7 +21,13 @@ func (p *Pool[R]) Get() R {
 	defer p.mu.Unlock()
 
 	if len(p.objects) == 0 {
-		return p.newFn()
+		if p.newFn != nil {
+			return p.newFn()
+		}
+
+		var zero R
+
+		return zero
 	}
 
 	last := len(p.objects) - 1

@@ -36,9 +36,9 @@ import (
 	"go.uber.org/zap"
 )
 
-var buildVersion string
-var buildDate string
-var buildCommit string
+var buildVersion = "N/A"
+var buildDate = "N/A"
+var buildCommit = "N/A"
 
 const (
 	shortURLLen     = 10
@@ -78,17 +78,6 @@ type URLRepository interface {
 }
 
 func main() {
-
-	if buildVersion == "" {
-		buildVersion = "N/A"
-	}
-	if buildDate == "" {
-		buildDate = "N/A"
-	}
-	if buildCommit == "" {
-		buildCommit = "N/A"
-	}
-
 	fmt.Printf("Build version: %s\n", buildVersion)
 	fmt.Printf("Build date: %s\n", buildDate)
 	fmt.Printf("Build commit: %s\n", buildCommit)
@@ -109,7 +98,6 @@ func main() {
 	if err != nil {
 		if !errors.Is(err, config.ErrConfigFileNotFound) {
 			logger.Fatal("failed to parse config", zap.Error(err))
-			panic("failed to parse config")
 		}
 		logger.Info("no config file found")
 	}
@@ -265,7 +253,6 @@ func main() {
 	select {
 	case err := <-servErr:
 		logger.Fatal("failed to start server", zap.Error(err))
-		panic("failed to start server")
 	case <-ctx.Done():
 		stop()
 		logger.Info("shutdown signal received")

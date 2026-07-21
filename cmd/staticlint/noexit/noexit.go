@@ -6,6 +6,7 @@ package noexit
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -34,7 +35,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				}
 			case *ast.CallExpr:
 				// Проверяем что вызванная функция это os.Exit
-				if isExitCall(n) {
+				if isExitCall(pass, n) {
 					pass.Reportf(n.Pos(), "call os.Exit function")
 					return false
 				}
@@ -46,7 +47,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	return nil, nil
 }
 
-func isExitCall(call *ast.CallExpr) bool {
+func isExitCall(pass *analysis.Pass, call *ast.CallExpr) bool {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok {
 		return false
@@ -61,7 +62,12 @@ func isExitCall(call *ast.CallExpr) bool {
 		return false
 	}
 
-	if ident.Name != "os" {
+	pkgName, ok := pass.TypesInfo.Uses[ident].(*types.PkgName)
+	if !ok {
+		return false
+	}
+
+	if pkgName.Imported().Path() != "os" {
 		return false
 	}
 

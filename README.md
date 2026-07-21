@@ -2,6 +2,14 @@
 
 Шаблон репозитория для трека «Сервис сокращения URL».
 
+## Компиляция сервиса
+
+Запустите в этой директории 
+```shell
+go build -ldflags "-X 'main.buildVersion=v1.0.1' -X 'main.buildDate=$(date +'%Y/%m/%d')' -X 'main.buildCommit=$(git rev-parse HEAD)'" -o ./cmd/shortener/shortener ./cmd/shortener/main.go 
+```
+
+
 ## Начало работы
 
 1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.

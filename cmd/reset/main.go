@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -50,8 +51,7 @@ func main() {
 
 	files, err := getAllFiles(".")
 	if err != nil {
-		logger.Error("Failed to get all files", slog.String("error", err.Error()))
-		panic(err)
+		log.Fatal("Failed to get all files:", err.Error())
 	}
 
 	g := NewGenerator()
@@ -152,8 +152,12 @@ func parse(g *Generator, path string) (string, []*StructData, error) {
 			for _, field := range structType.Fields.List {
 
 				for _, fname := range field.Names {
-					structData.NullifyFields = append(structData.NullifyFields,
-						g.GenerateNullifyField(shortName, fname.Name, field.Type))
+					nullField, err := g.GenerateNullifyField(shortName, fname.Name, field.Type)
+					if err != nil {
+						return "", nil, err
+					}
+
+					structData.NullifyFields = append(structData.NullifyFields, nullField)
 				}
 			}
 

@@ -49,3 +49,21 @@ func TestPool(t *testing.T) {
 	assert.Equal(t, 2, baz.id)
 	assert.Equal(t, 0, baz.data)
 }
+
+func TestPool_NilFunc(t *testing.T) {
+	pool := New[*testStruct](nil)
+
+	foo := &testStruct{
+		id:   1,
+		data: 42,
+	}
+
+	pool.Put(foo)
+
+	bar := pool.Get()
+	assert.Equal(t, 1, bar.id)
+	assert.Equal(t, 0, bar.data)
+
+	assert.Nil(t, pool.Get())
+
+}
