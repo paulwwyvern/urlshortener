@@ -13,10 +13,10 @@ func NewStorage() *Storage {
 }
 
 func (s *Storage) CreateUser(_ context.Context) (int32, error) {
-	userId := rand.Int31()
-	for userId == 0 {
-		userId = rand.Int31()
+	userID := rand.Int31()
+	for userID == 0 {
+		userID = rand.Int31()
 	}
 
-	return userId, nil
+	return userID, nil
 }

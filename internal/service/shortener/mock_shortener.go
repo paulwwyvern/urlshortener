@@ -18,32 +18,32 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockUrlRepository is a mock of UrlRepository interface.
-type MockUrlRepository struct {
+// MockURLRepository is a mock of URLRepository interface.
+type MockURLRepository struct {
 	ctrl     *gomock.Controller
-	recorder *MockUrlRepositoryMockRecorder
+	recorder *MockURLRepositoryMockRecorder
 	isgomock struct{}
 }
 
-// MockUrlRepositoryMockRecorder is the mock recorder for MockUrlRepository.
-type MockUrlRepositoryMockRecorder struct {
-	mock *MockUrlRepository
+// MockURLRepositoryMockRecorder is the mock recorder for MockURLRepository.
+type MockURLRepositoryMockRecorder struct {
+	mock *MockURLRepository
 }
 
-// NewMockUrlRepository creates a new mock instance.
-func NewMockUrlRepository(ctrl *gomock.Controller) *MockUrlRepository {
-	mock := &MockUrlRepository{ctrl: ctrl}
-	mock.recorder = &MockUrlRepositoryMockRecorder{mock}
+// NewMockURLRepository creates a new mock instance.
+func NewMockURLRepository(ctrl *gomock.Controller) *MockURLRepository {
+	mock := &MockURLRepository{ctrl: ctrl}
+	mock.recorder = &MockURLRepositoryMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockUrlRepository) EXPECT() *MockUrlRepositoryMockRecorder {
+func (m *MockURLRepository) EXPECT() *MockURLRepositoryMockRecorder {
 	return m.recorder
 }
 
 // GetShortURL mocks base method.
-func (m *MockUrlRepository) GetShortURL(ctx context.Context, url string) (string, error) {
+func (m *MockURLRepository) GetShortURL(ctx context.Context, url string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetShortURL", ctx, url)
 	ret0, _ := ret[0].(string)
@@ -52,28 +52,28 @@ func (m *MockUrlRepository) GetShortURL(ctx context.Context, url string) (string
 }
 
 // GetShortURL indicates an expected call of GetShortURL.
-func (mr *MockUrlRepositoryMockRecorder) GetShortURL(ctx, url any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) GetShortURL(ctx, url any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShortURL", reflect.TypeOf((*MockUrlRepository)(nil).GetShortURL), ctx, url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShortURL", reflect.TypeOf((*MockURLRepository)(nil).GetShortURL), ctx, url)
 }
 
 // GetURL mocks base method.
-func (m *MockUrlRepository) GetURL(ctx context.Context, shortUrl string) (string, error) {
+func (m *MockURLRepository) GetURL(ctx context.Context, shortURL string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetURL", ctx, shortUrl)
+	ret := m.ctrl.Call(m, "GetURL", ctx, shortURL)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetURL indicates an expected call of GetURL.
-func (mr *MockUrlRepositoryMockRecorder) GetURL(ctx, shortUrl any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) GetURL(ctx, shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetURL", reflect.TypeOf((*MockUrlRepository)(nil).GetURL), ctx, shortUrl)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetURL", reflect.TypeOf((*MockURLRepository)(nil).GetURL), ctx, shortURL)
 }
 
 // GetUserURL mocks base method.
-func (m *MockUrlRepository) GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
+func (m *MockURLRepository) GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetUserURL", ctx, userId)
 	ret0, _ := ret[0].([]dto.GetUserURLResponse)
@@ -82,13 +82,13 @@ func (m *MockUrlRepository) GetUserURL(ctx context.Context, userId int32) ([]dto
 }
 
 // GetUserURL indicates an expected call of GetUserURL.
-func (mr *MockUrlRepositoryMockRecorder) GetUserURL(ctx, userId any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) GetUserURL(ctx, userId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURL", reflect.TypeOf((*MockUrlRepository)(nil).GetUserURL), ctx, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURL", reflect.TypeOf((*MockURLRepository)(nil).GetUserURL), ctx, userId)
 }
 
 // Ping mocks base method.
-func (m *MockUrlRepository) Ping(arg0 context.Context) error {
+func (m *MockURLRepository) Ping(arg0 context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Ping", arg0)
 	ret0, _ := ret[0].(error)
@@ -96,27 +96,27 @@ func (m *MockUrlRepository) Ping(arg0 context.Context) error {
 }
 
 // Ping indicates an expected call of Ping.
-func (mr *MockUrlRepositoryMockRecorder) Ping(arg0 any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) Ping(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockUrlRepository)(nil).Ping), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockURLRepository)(nil).Ping), arg0)
 }
 
 // SaveURL mocks base method.
-func (m *MockUrlRepository) SaveURL(ctx context.Context, userId int32, shortUrl, url string) error {
+func (m *MockURLRepository) SaveURL(ctx context.Context, userId int32, shortURL, url string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveURL", ctx, userId, shortUrl, url)
+	ret := m.ctrl.Call(m, "SaveURL", ctx, userId, shortURL, url)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SaveURL indicates an expected call of SaveURL.
-func (mr *MockUrlRepositoryMockRecorder) SaveURL(ctx, userId, shortUrl, url any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) SaveURL(ctx, userId, shortURL, url any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURL", reflect.TypeOf((*MockUrlRepository)(nil).SaveURL), ctx, userId, shortUrl, url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURL", reflect.TypeOf((*MockURLRepository)(nil).SaveURL), ctx, userId, shortURL, url)
 }
 
 // SaveURLBatch mocks base method.
-func (m *MockUrlRepository) SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error {
+func (m *MockURLRepository) SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SaveURLBatch", ctx, userId, urls)
 	ret0, _ := ret[0].(error)
@@ -124,51 +124,51 @@ func (m *MockUrlRepository) SaveURLBatch(ctx context.Context, userId int32, urls
 }
 
 // SaveURLBatch indicates an expected call of SaveURLBatch.
-func (mr *MockUrlRepositoryMockRecorder) SaveURLBatch(ctx, userId, urls any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) SaveURLBatch(ctx, userId, urls any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURLBatch", reflect.TypeOf((*MockUrlRepository)(nil).SaveURLBatch), ctx, userId, urls)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURLBatch", reflect.TypeOf((*MockURLRepository)(nil).SaveURLBatch), ctx, userId, urls)
 }
 
 // SoftDeleteURLBatch mocks base method.
-func (m *MockUrlRepository) SoftDeleteURLBatch(ctx context.Context, userId int32, shortUrls []string) error {
+func (m *MockURLRepository) SoftDeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SoftDeleteURLBatch", ctx, userId, shortUrls)
+	ret := m.ctrl.Call(m, "SoftDeleteURLBatch", ctx, userId, shortURLs)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SoftDeleteURLBatch indicates an expected call of SoftDeleteURLBatch.
-func (mr *MockUrlRepositoryMockRecorder) SoftDeleteURLBatch(ctx, userId, shortUrls any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) SoftDeleteURLBatch(ctx, userId, shortURLs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteURLBatch", reflect.TypeOf((*MockUrlRepository)(nil).SoftDeleteURLBatch), ctx, userId, shortUrls)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteURLBatch", reflect.TypeOf((*MockURLRepository)(nil).SoftDeleteURLBatch), ctx, userId, shortURLs)
 }
 
-// MockUrlGenerator is a mock of UrlGenerator interface.
-type MockUrlGenerator struct {
+// MockURLGenerator is a mock of URLGenerator interface.
+type MockURLGenerator struct {
 	ctrl     *gomock.Controller
-	recorder *MockUrlGeneratorMockRecorder
+	recorder *MockURLGeneratorMockRecorder
 	isgomock struct{}
 }
 
-// MockUrlGeneratorMockRecorder is the mock recorder for MockUrlGenerator.
-type MockUrlGeneratorMockRecorder struct {
-	mock *MockUrlGenerator
+// MockURLGeneratorMockRecorder is the mock recorder for MockURLGenerator.
+type MockURLGeneratorMockRecorder struct {
+	mock *MockURLGenerator
 }
 
-// NewMockUrlGenerator creates a new mock instance.
-func NewMockUrlGenerator(ctrl *gomock.Controller) *MockUrlGenerator {
-	mock := &MockUrlGenerator{ctrl: ctrl}
-	mock.recorder = &MockUrlGeneratorMockRecorder{mock}
+// NewMockURLGenerator creates a new mock instance.
+func NewMockURLGenerator(ctrl *gomock.Controller) *MockURLGenerator {
+	mock := &MockURLGenerator{ctrl: ctrl}
+	mock.recorder = &MockURLGeneratorMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockUrlGenerator) EXPECT() *MockUrlGeneratorMockRecorder {
+func (m *MockURLGenerator) EXPECT() *MockURLGeneratorMockRecorder {
 	return m.recorder
 }
 
 // Generate mocks base method.
-func (m *MockUrlGenerator) Generate() string {
+func (m *MockURLGenerator) Generate() string {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Generate")
 	ret0, _ := ret[0].(string)
@@ -176,7 +176,7 @@ func (m *MockUrlGenerator) Generate() string {
 }
 
 // Generate indicates an expected call of Generate.
-func (mr *MockUrlGeneratorMockRecorder) Generate() *gomock.Call {
+func (mr *MockURLGeneratorMockRecorder) Generate() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockUrlGenerator)(nil).Generate))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Generate", reflect.TypeOf((*MockURLGenerator)(nil).Generate))
 }

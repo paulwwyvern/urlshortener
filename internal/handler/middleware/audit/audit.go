@@ -22,7 +22,7 @@ func WithAudit(logger *zap.Logger, pub AuditPublisher, action string) func(http.
 			h.ServeHTTP(w, r)
 
 			timestamp := time.Now().Unix()
-			userId := httpuser.GetUserID(r)
+			userID := httpuser.GetUserID(r)
 			url, ok := httpurl.GetURL(r)
 
 			if !ok {
@@ -33,7 +33,7 @@ func WithAudit(logger *zap.Logger, pub AuditPublisher, action string) func(http.
 				TS:     timestamp,
 				URL:    url,
 				Action: action,
-				UserID: userId,
+				UserID: userID,
 			}
 
 			err := pub.Update(event)

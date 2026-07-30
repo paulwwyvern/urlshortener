@@ -59,7 +59,7 @@ func TestHandler_GenerateURL(t *testing.T) {
 				code:     409,
 				response: `http://localhost:8080`,
 			},
-			wantErr: errs.ErrOriginalUrlAlreadyExists,
+			wantErr: errs.ErrOriginalURLAlreadyExists,
 		},
 	}
 
@@ -118,7 +118,7 @@ func TestHandler_GetURL(t *testing.T) {
 				code:     404,
 				location: ``,
 			},
-			wantErr: errs.ErrShortUrlNotFound,
+			wantErr: errs.ErrShortURLNotFound,
 		}, {
 			name: "Test #3 Gone",
 			url:  "/Scuf38812",
@@ -126,7 +126,7 @@ func TestHandler_GetURL(t *testing.T) {
 				code:     410,
 				location: ``,
 			},
-			wantErr: errs.ErrShortUrlGone,
+			wantErr: errs.ErrShortURLGone,
 		}, {
 			name: "Test #4 Internal error",
 			url:  "/Scuf38812",
@@ -301,7 +301,7 @@ func TestHandler_GenerateUrlJson(t *testing.T) {
 				response:    `http://localhost:8080/`,
 				contentType: `application/json`,
 			},
-			wantErr:         errs.ErrOriginalUrlAlreadyExists,
+			wantErr:         errs.ErrOriginalURLAlreadyExists,
 			wantServiceCall: true,
 		},
 	}

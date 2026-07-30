@@ -2,13 +2,14 @@ package stdhttp
 
 import (
 	"errors"
-	"github.com/paulwwyvern/urlshortener/internal/model/errs"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/paulwwyvern/urlshortener/internal/model/errs"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 )
 
 func TestHandler_GenerateURL(t *testing.T) {
@@ -96,7 +97,7 @@ func TestHandler_GetURL(t *testing.T) {
 				code:     400,
 				location: ``,
 			},
-			wantErr: errs.ErrShortUrlNotFound,
+			wantErr: errs.ErrShortURLNotFound,
 		},
 	}
 

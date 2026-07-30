@@ -66,7 +66,6 @@ func (s *LRUCache[K, V]) Delete(key K) {
 
 	s.list.Remove(e)
 	delete(s.cache, key)
-	return
 }
 
 func (s *LRUCache[K, V]) removeOldest() {

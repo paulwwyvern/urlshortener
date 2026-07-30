@@ -14,6 +14,6 @@ func SetUserID(r *http.Request, userID int32) {
 }
 
 func GetUserID(r *http.Request) int32 {
-	userId, _ := r.Context().Value(User).(int32)
-	return userId
+	userID, _ := r.Context().Value(User).(int32)
+	return userID
 }
