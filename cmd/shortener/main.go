@@ -244,11 +244,23 @@ func main() {
 
 	// run server
 	servErr := make(chan error)
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			servErr <- err
-		}
-	}()
+	if conf.EnableHTTPS {
+		logger.Info("Start HTTP server with TLS")
+
+		go func() {
+			if err := server.ListenAndServeTLS(conf.CertPath, conf.KeyPath); err != nil {
+				servErr <- err
+			}
+		}()
+	} else {
+		logger.Info("Start HTTP server")
+
+		go func() {
+			if err := server.ListenAndServe(); err != nil {
+				servErr <- err
+			}
+		}()
+	}
 
 	select {
 	case err := <-servErr:

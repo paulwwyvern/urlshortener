@@ -20,6 +20,9 @@ type Config struct {
 	DatabaseDsn     string `yaml:"database_dsn" env:"DATABASE_DSN"`
 	AuditFile       string `yaml:"audit_file" env:"AUDIT_FILE"`
 	AuditURL        string `yaml:"audit_url" env:"AUDIT_URL"`
+	EnableHTTPS     bool   `yaml:"enable_https" env:"ENABLE_HTTPS"`
+	CertPath        string `yaml:"cert_path" env:"CERT_PATH"`
+	KeyPath         string `yaml:"key_path" env:"KEY_PATH"`
 }
 
 // TODO: переписать логику обработки конфига
@@ -54,7 +57,7 @@ func ParseConfig() (*Config, error) {
 }
 
 func flagParse(conf *Config) error {
-
+	flag.BoolVar(&conf.EnableHTTPS, "s", false, "enable https")
 	flag.StringVar(&conf.ConfigPath, "c", "./config/conf.yaml", "path to config file")
 	flag.StringVar(&conf.ServerAddress, "a", "", "server address")
 	flag.StringVar(&conf.BaseURL, "b", "", "base url")
