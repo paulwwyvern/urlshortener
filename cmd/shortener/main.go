@@ -287,12 +287,8 @@ func main() {
 		logger.Info("shutdown signal received")
 	}
 
-	shutdownCtx, _ := context.WithTimeout(context.Background(), shutdownTimeout)
-
-	go func() {
-		<-shutdownCtx.Done()
-		logger.Fatal("timeout shutting down server")
-	}()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("failed to graceful shutdown server", zap.Error(err))

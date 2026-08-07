@@ -56,7 +56,8 @@ func ParseConfig() (*Config, error) {
 
 func flagParse(conf *Config) error {
 	flag.BoolVar(&conf.EnableHTTPS, "s", false, "enable https")
-	flag.StringVar(&conf.ConfigPath, "c", "./config/conf.json", "path to config file")
+	flag.StringVar(&conf.ConfigPath, "c", "", "path to config file")
+	flag.StringVar(&conf.ConfigPath, "config", "./config/conf.json", "path to config file")
 	flag.StringVar(&conf.ServerAddress, "a", "", "server address")
 	flag.StringVar(&conf.BaseURL, "b", "", "base url")
 	flag.StringVar(&conf.FileStoragePath, "f", "", "file storage path")
