@@ -9,6 +9,17 @@
 go build -ldflags "-X 'main.buildVersion=v1.0.1' -X 'main.buildDate=$(date +'%Y/%m/%d')' -X 'main.buildCommit=$(git rev-parse HEAD)'" -o ./cmd/shortener/shortener ./cmd/shortener/main.go 
 ```
 
+## Запуск
+
+```shell
+./cmd/shortener/shortener -c "path/to/config"
+```
+
+Вместо `-c` можно использовать `-config` или переменную окружения `CONFIG`
+
+Поддерживаемые форматы : `json` `yaml`
+
+Пример `json` указан в `./config.example.json` 
 
 ## Начало работы
 

@@ -29,3 +29,4 @@ vendor/
 /migrate.sh
 /cmd/staticlint/staticlint
 /cmd/reset/reset
+/cert/

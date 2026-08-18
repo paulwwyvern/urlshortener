@@ -92,6 +92,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer logger.Sync()
+	defer logger.Info("shutdown complete")
 
 	// parse config
 	conf, err := config.ParseConfig()
@@ -131,7 +132,10 @@ func main() {
 		}
 	}
 
-	defer repo.Close()
+	defer func() {
+		err := repo.Close()
+		logger.Info("repository closed", zap.Error(err))
+	}()
 
 	// init user repo
 	userRepo := userstorage.NewStorage()
@@ -160,7 +164,10 @@ func main() {
 	}
 
 	shortenerService := shortener.NewShortener(logger, shortenerServiceConfig)
-	defer shortenerService.Close()
+	defer func() {
+		err := shortenerService.Close()
+		logger.Info("shortener service closed", zap.Error(err))
+	}()
 
 	userService := user.NewService(logger, userRepo)
 
@@ -174,7 +181,11 @@ func main() {
 		logger.Info("Init audit log logger service")
 		auditSub := auditlog.NewAuditLogLogger(logger)
 		auditPub.Register(auditSub)
-		defer auditSub.Close()
+
+		defer func() {
+			err := auditSub.Close()
+			logger.Info("audit log logger closed", zap.Error(err))
+		}()
 	}
 
 	if conf.AuditFile != "" {
@@ -184,7 +195,10 @@ func main() {
 			logger.Fatal("Init audit file service", zap.Error(err))
 		} else {
 			auditPub.Register(auditSub)
-			defer auditSub.Close()
+			defer func() {
+				err := auditSub.Close()
+				logger.Info("audit log file closed", zap.Error(err))
+			}()
 		}
 	}
 
@@ -194,7 +208,10 @@ func main() {
 		auditSub := auditlog.NewAuditLogURL(conf.AuditURL)
 
 		auditPub.Register(auditSub)
-		defer auditSub.Close()
+		defer func() {
+			err := auditSub.Close()
+			logger.Info("audit log url closed", zap.Error(err))
+		}()
 	}
 
 	// init handler
@@ -244,11 +261,23 @@ func main() {
 
 	// run server
 	servErr := make(chan error)
-	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			servErr <- err
-		}
-	}()
+	if conf.EnableHTTPS {
+		logger.Info("Start HTTP server with TLS")
+
+		go func() {
+			if err := server.ListenAndServeTLS(conf.CertPath, conf.KeyPath); err != nil {
+				servErr <- err
+			}
+		}()
+	} else {
+		logger.Info("Start HTTP server")
+
+		go func() {
+			if err := server.ListenAndServe(); err != nil {
+				servErr <- err
+			}
+		}()
+	}
 
 	select {
 	case err := <-servErr:
@@ -264,6 +293,5 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("failed to graceful shutdown server", zap.Error(err))
 	}
-	logger.Info("shutdown complete")
 
 }

@@ -1,0 +1,9 @@
+{
+  "server_address": "localhost:8080",
+  "base_url": "http://localhost",
+  "file_storage_path": "./path/to/database.txt",
+  "database_dsn": "postgres://username:password@server:port/database?sslmode=disable",
+  "enable_https": false,
+  "cert_path": "path/to/cert.pem",
+  "key_path": "path/to/key.pem"
+}
