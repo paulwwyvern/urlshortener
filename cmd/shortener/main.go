@@ -26,7 +26,6 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/throughcache"
-	"github.com/paulwwyvern/urlshortener/internal/repository/userstorage"
 	auditpub "github.com/paulwwyvern/urlshortener/internal/service/audit"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener/workers"
@@ -69,10 +68,13 @@ type URLRepository interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
 	GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error)
+	GetURLCount(ctx context.Context) (int, error)
 	SaveURL(ctx context.Context, userID int32, shortURL string, url string) error
 	SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error
 	SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
 	PurgeURLBatch(ctx context.Context, urls []string) error
+	CreateUser(ctx context.Context) (int32, error)
+	GetUserCount(ctx context.Context) (int, error)
 	Ping(context.Context) error
 	Close() error
 }
@@ -137,9 +139,6 @@ func main() {
 		logger.Info("repository closed", zap.Error(err))
 	}()
 
-	// init user repo
-	userRepo := userstorage.NewStorage()
-
 	// init generator
 	generator := strgenerator.NewGenerator(
 		strgenerator.Digits+strgenerator.UppercaseLatin+strgenerator.LowercaseLatin,
@@ -169,7 +168,7 @@ func main() {
 		logger.Info("shortener service closed", zap.Error(err))
 	}()
 
-	userService := user.NewService(logger, userRepo)
+	userService := user.NewService(logger, repo)
 
 	// audit
 
@@ -226,6 +225,8 @@ func main() {
 
 	r.Get("/ping", h.Ping)
 	r.Mount("/debug", middleware.Profiler())
+
+	r.Get("/api/internal/stats", h.GetStats)
 
 	r.Group(func(r chi.Router) {
 		r.Use(mwaudit.WithAudit(logger, auditPub, "follow"))

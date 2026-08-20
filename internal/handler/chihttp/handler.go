@@ -22,6 +22,7 @@ type ShortenerService interface {
 	GenerateURL(ctx context.Context, userID int32, url string) (string, error)
 	GenerateURLBatch(ctx context.Context, userID int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error)
 	DeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
+	GetStats(ctx context.Context) (dto.GetStatsResponse, error)
 	Ping(ctx context.Context) error
 }
 
@@ -334,6 +335,36 @@ func (h *Handler) deleteURLJsonBatch(w http.ResponseWriter, r *http.Request) err
 	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(http.StatusAccepted)
+	return nil
+}
+
+// GetStats возвращает статистику(количество зареганных урлов и юзеров)
+//
+// Возвращаемые коды:
+//
+// 200 - Всё ок
+//
+// 500 - внутренняя ошибка сервера
+func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.getStats)(w, r)
+}
+
+func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	stats, err := h.service.GetStats(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(stats)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

@@ -2,6 +2,7 @@ package inmemory
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 
 	"github.com/paulwwyvern/urlshortener/internal/model"
@@ -70,6 +71,12 @@ func (s *Storage) GetUserURL(_ context.Context, userID int32) ([]dto.GetUserURLR
 	}
 
 	return userURLs, nil
+}
+
+func (s *Storage) GetURLCount(_ context.Context) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.shortURLIndex), nil
 }
 
 func (s *Storage) SaveURL(_ context.Context, userID int32, shortURL string, originalURL string) error {
@@ -171,6 +178,23 @@ func (s *Storage) SoftDeleteURLBatch(_ context.Context, userID int32, shortURLs 
 	}
 
 	return nil
+}
+
+func (s *Storage) CreateUser(_ context.Context) (int32, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	userID := rand.Int31()
+	for s.userIDIndex[userID] != nil {
+		userID = rand.Int31()
+	}
+	s.userIDIndex[userID] = make(map[*model.URLFile]struct{})
+	return userID, nil
+}
+
+func (s *Storage) GetUserCount(_ context.Context) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.userIDIndex), nil
 }
 
 func (s *Storage) PurgeURLBatch(_ context.Context, _ []string) error {

@@ -19,9 +19,12 @@ type URLRepository interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
 	GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error)
+	GetURLCount(ctx context.Context) (int, error)
 	SaveURL(ctx context.Context, userID int32, shortURL string, url string) error
 	SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error
 	SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
+	CreateUser(ctx context.Context) (int32, error)
+	GetUserCount(ctx context.Context) (int, error)
 	Ping(context.Context) error
 }
 
@@ -233,6 +236,36 @@ func (s *ShortenerService) GetUserURLs(ctx context.Context, userID int32) ([]dto
 	}
 
 	return userURL, nil
+}
+
+// CreateUser создаёт нового пользователя и возвращает его id
+func (s *ShortenerService) CreateUser(ctx context.Context) (int32, error) {
+	userID, err := s.urlRepo.CreateUser(ctx)
+	if err != nil {
+		return 0, err
+	}
+	s.logger.Info("Created user", zap.Int32("userId", userID))
+	return userID, nil
+}
+
+// GetStats возвращает количество зареганных юзеров и урлов
+func (s *ShortenerService) GetStats(ctx context.Context) (dto.GetStatsResponse, error) {
+	userCount, err := s.urlRepo.GetUserCount(ctx)
+	if err != nil {
+		return dto.GetStatsResponse{}, err
+	}
+
+	urlCount, err := s.urlRepo.GetURLCount(ctx)
+	if err != nil {
+		return dto.GetStatsResponse{}, err
+	}
+
+	stats := dto.GetStatsResponse{
+		URLs:  urlCount,
+		Users: userCount,
+	}
+
+	return stats, nil
 }
 
 // DeleteURLBatch помечает указанные урлы как удалённые и передаёт их воркеру, чтобы он их потом

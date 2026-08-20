@@ -22,3 +22,8 @@ type GenerateURLBatchResponse struct {
 type GenerateURLJsonRequest struct {
 	URL string `json:"url"`
 }
+
+type GetStatsResponse struct {
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
+}
