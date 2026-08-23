@@ -23,6 +23,7 @@ type Config struct {
 	EnableHTTPS     bool   `yaml:"enable_https" json:"enable_https" env:"ENABLE_HTTPS"`
 	CertPath        string `yaml:"cert_path" json:"cert_path" env:"CERT_PATH"`
 	KeyPath         string `yaml:"key_path" json:"key_path" env:"KEY_PATH"`
+	TrustedSubnet   string `yaml:"trusted_subnet" json:"trusted_subnet" env:"TRUSTED_SUBNET"`
 }
 
 func ParseConfig() (*Config, error) {
@@ -64,6 +65,7 @@ func flagParse(conf *Config) error {
 	flag.StringVar(&conf.DatabaseDsn, "d", "", "database dsn")
 	flag.StringVar(&conf.AuditFile, "audit-file", "", "audit file")
 	flag.StringVar(&conf.AuditURL, "audit-url", "", "audit url")
+	flag.StringVar(&conf.TrustedSubnet, "t", "", "trusted subnet")
 
 	flag.Parse()
 	return nil

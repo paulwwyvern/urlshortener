@@ -19,6 +19,8 @@ import (
 	mwauth "github.com/paulwwyvern/urlshortener/internal/handler/middleware/auth"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
+	mwtrusted "github.com/paulwwyvern/urlshortener/internal/handler/middleware/trusted"
+
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/dto"
 	auditlog "github.com/paulwwyvern/urlshortener/internal/repository/audit"
@@ -62,6 +64,8 @@ const (
 	purgeInterval     = 10 * time.Second
 
 	cacheCapacity = 10
+
+	userIpHeader = "X-Real-IP"
 )
 
 type URLRepository interface {
@@ -226,8 +230,10 @@ func main() {
 	r.Get("/ping", h.Ping)
 	r.Mount("/debug", middleware.Profiler())
 
-	r.Get("/api/internal/stats", h.GetStats)
-
+	r.Group(func(r chi.Router) {
+		r.Use(mwtrusted.WithOnlyTrustedSubnet(userIpHeader, conf.TrustedSubnet))
+		r.Get("/api/internal/stats", h.GetStats)
+	})
 	r.Group(func(r chi.Router) {
 		r.Use(mwaudit.WithAudit(logger, auditPub, "follow"))
 		r.Get("/{url}", h.GetURL)

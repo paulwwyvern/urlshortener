@@ -167,7 +167,7 @@ func (s *Storage) GetURLCount(ctx context.Context) (int, error) {
 	var count int
 	err = stmt.QueryRowContext(ctx).Scan(&count)
 	if err != nil {
-		fmt.Errorf("GetURLCount: failed to query rows: %w", err)
+		return 0, fmt.Errorf("GetURLCount: failed to query rows: %w", err)
 	}
 	return count, nil
 }
