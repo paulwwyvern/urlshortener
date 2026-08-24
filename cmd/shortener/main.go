@@ -73,7 +73,7 @@ const (
 
 	cacheCapacity = 10
 
-	userIpHeader = "X-Real-IP"
+	userIPHeader = "X-Real-IP"
 )
 
 type URLRepository interface {
@@ -239,7 +239,7 @@ func main() {
 	r.Mount("/debug", middleware.Profiler())
 
 	r.Group(func(r chi.Router) {
-		r.Use(mwtrusted.WithOnlyTrustedSubnet(userIpHeader, conf.TrustedSubnet))
+		r.Use(mwtrusted.WithOnlyTrustedSubnet(userIPHeader, conf.TrustedSubnet))
 		r.Get("/api/internal/stats", h.GetStats)
 	})
 	r.Group(func(r chi.Router) {

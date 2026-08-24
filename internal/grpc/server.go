@@ -53,9 +53,9 @@ func (s *Server) ShortenURL(ctx context.Context, req *proto.URLShortenRequest) (
 }
 
 func (s *Server) ExpandURL(ctx context.Context, req *proto.URLExpandRequest) (*proto.URLExpandResponse, error) {
-	shortUrl := req.GetId()
+	shortURL := req.GetId()
 
-	url, err := s.service.GetURL(ctx, shortUrl)
+	url, err := s.service.GetURL(ctx, shortURL)
 	if err != nil {
 		if errors.Is(err, errs.ErrShortURLNotFound) || errors.Is(err, errs.ErrShortURLGone) {
 			return nil, status.Error(codes.NotFound, err.Error())
