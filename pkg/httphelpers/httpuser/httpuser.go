@@ -2,18 +2,17 @@ package httpuser
 
 import (
 	"context"
-	"net/http"
 )
 
 type CtxKey string
 
 var User CtxKey = "user"
 
-func SetUserID(r *http.Request, userID int32) {
-	*r = *r.WithContext(context.WithValue(r.Context(), User, userID))
+func SetUserID(ctx context.Context, userID int32) context.Context {
+	return context.WithValue(ctx, User, userID)
 }
 
-func GetUserID(r *http.Request) int32 {
-	userID, _ := r.Context().Value(User).(int32)
+func GetUserID(ctx context.Context) int32 {
+	userID, _ := ctx.Value(User).(int32)
 	return userID
 }

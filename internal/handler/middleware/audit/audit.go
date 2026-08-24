@@ -17,13 +17,13 @@ type AuditPublisher interface {
 func WithAudit(logger *zap.Logger, pub AuditPublisher, action string) func(http.Handler) http.Handler {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			r = httpurl.AddURL(r)
+			r = r.WithContext(httpurl.AddURL(r.Context()))
 
 			h.ServeHTTP(w, r)
 
 			timestamp := time.Now().Unix()
-			userID := httpuser.GetUserID(r)
-			url, ok := httpurl.GetURL(r)
+			userID := httpuser.GetUserID(r.Context())
+			url, ok := httpurl.GetURL(r.Context())
 
 			if !ok {
 				return

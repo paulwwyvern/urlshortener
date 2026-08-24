@@ -13,13 +13,21 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	grpcmwauth "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
+	grpcmwselector "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/selector"
+	"github.com/paulwwyvern/urlshortener/api/proto"
 	"github.com/paulwwyvern/urlshortener/internal/config"
+	grpcserver "github.com/paulwwyvern/urlshortener/internal/grpc"
+	grpcmwauthfunc "github.com/paulwwyvern/urlshortener/internal/grpc/middleware/auth"
+	grpcmwlogger "github.com/paulwwyvern/urlshortener/internal/grpc/middleware/logger"
+	grpcmwselectormatcher "github.com/paulwwyvern/urlshortener/internal/grpc/middleware/selector"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	mwaudit "github.com/paulwwyvern/urlshortener/internal/handler/middleware/audit"
 	mwauth "github.com/paulwwyvern/urlshortener/internal/handler/middleware/auth"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
 	mwtrusted "github.com/paulwwyvern/urlshortener/internal/handler/middleware/trusted"
+	"google.golang.org/grpc"
 
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/dto"
@@ -266,6 +274,22 @@ func main() {
 		IdleTimeout:  serverIdleTimeout,
 	}
 
+	// init grpc server
+	gs := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			// интерсептор чтобы не все методы были защищены auth
+			grpcmwselector.UnaryServerInterceptor(
+				grpcmwauth.UnaryServerInterceptor(grpcmwauthfunc.GetAuthFunc(authSignKey)),
+				grpcmwselectormatcher.ProtectedMethodMatcher(map[string]bool{
+					proto.ShortenerService_ExpandURL_FullMethodName: true,
+				}),
+			),
+			// логгер
+			grpcmwlogger.UnaryLoggerInterceptor(logger),
+		),
+	)
+	proto.RegisterShortenerServiceServer(gs, grpcserver.NewServer(logger, shortenerService))
+
 	// run server
 	servErr := make(chan error)
 	if conf.EnableHTTPS {
@@ -286,6 +310,19 @@ func main() {
 		}()
 	}
 
+	// run grpc server
+	go func() {
+		listen, err := net.Listen("tcp", conf.GRPCServerAddress)
+		if err != nil {
+			servErr <- err
+			return
+		}
+		logger.Info("Start gRPC server")
+		if err := gs.Serve(listen); err != nil {
+			servErr <- err
+		}
+	}()
+
 	select {
 	case err := <-servErr:
 		logger.Fatal("failed to start server", zap.Error(err))
@@ -297,8 +334,12 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdownCancel()
 
+	logger.Info("Start graceful shutdown server")
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("failed to graceful shutdown server", zap.Error(err))
 	}
+
+	logger.Info("Start graceful shutdown grpc server")
+	gs.GracefulStop()
 
 }

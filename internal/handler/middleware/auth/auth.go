@@ -53,7 +53,7 @@ func WithAuthRequire(key string) func(http.Handler) http.Handler {
 				return err
 			}
 
-			httpuser.SetUserID(r, userID)
+			*r = *r.WithContext(httpuser.SetUserID(r.Context(), userID))
 
 			h.ServeHTTP(w, r)
 
@@ -99,7 +99,7 @@ func WithAuth(key string, userService UserService) func(http.Handler) http.Handl
 				http.SetCookie(w, cookie)
 			}
 
-			httpuser.SetUserID(r, userID)
+			*r = *r.WithContext(httpuser.SetUserID(r.Context(), userID))
 
 			h.ServeHTTP(w, r)
 

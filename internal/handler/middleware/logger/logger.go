@@ -53,7 +53,7 @@ func WithLogger(logger *zap.Logger) func(h http.Handler) http.Handler {
 			duration := time.Since(start)
 
 			err := httperr.GetError(r)
-			userID := httpuser.GetUserID(r)
+			userID := httpuser.GetUserID(r.Context())
 
 			logger.Info("Get request",
 				zap.Int32("user id", userID),
