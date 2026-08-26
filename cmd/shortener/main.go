@@ -232,6 +232,11 @@ func main() {
 
 	// routes
 
+	mwOnlyTrusted, err := mwtrusted.WithOnlyTrustedSubnet(userIPHeader, conf.TrustedSubnet)
+	if err != nil {
+		logger.Fatal("Init trusted subnet middleware", zap.Error(err))
+	}
+
 	r.Use(mwlogger.WithLogger(logger))
 	r.Use(mwcompress.WithCompress())
 
@@ -239,7 +244,7 @@ func main() {
 	r.Mount("/debug", middleware.Profiler())
 
 	r.Group(func(r chi.Router) {
-		r.Use(mwtrusted.WithOnlyTrustedSubnet(userIPHeader, conf.TrustedSubnet))
+		r.Use(mwOnlyTrusted)
 		r.Get("/api/internal/stats", h.GetStats)
 	})
 	r.Group(func(r chi.Router) {
@@ -277,10 +282,12 @@ func main() {
 	// init grpc server
 	gs := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
-			// интерсептор чтобы не все методы были защищены auth
+			// интерцептор чтобы не все методы были защищены auth
 			grpcmwselector.UnaryServerInterceptor(
+				// непосредственно интерцептор авторизации из пакета grpc-ecosystem/go-grpc-middleware
 				grpcmwauth.UnaryServerInterceptor(grpcmwauthfunc.GetAuthFunc(authSignKey)),
-				grpcmwselectormatcher.ProtectedMethodMatcher(map[string]bool{
+				// методы которые не должны быть защищены авторизацией
+				grpcmwselectormatcher.UnprotectedMethodMatcher(map[string]bool{
 					proto.ShortenerService_ExpandURL_FullMethodName: true,
 				}),
 			),

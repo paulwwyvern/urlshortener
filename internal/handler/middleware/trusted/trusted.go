@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
 )
@@ -14,9 +15,18 @@ import (
 // subnet указан в формате CIDR, если он пустой, то middleware никого не пускает дальше
 //
 // В header указан заголовок, в котором искать ip пользователя
-func WithOnlyTrustedSubnet(header string, subnet string) func(http.Handler) http.Handler {
+func WithOnlyTrustedSubnet(header string, subnet string) (func(http.Handler) http.Handler, error) {
+	var trustedSubnet *net.IPNet
 
-	_, trustedSubnet, _ := net.ParseCIDR(subnet)
+	subnet = strings.TrimSpace(subnet)
+	if subnet != "" {
+		var err error
+		_, trustedSubnet, err = net.ParseCIDR(subnet)
+
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return func(h http.Handler) http.Handler {
 		return httperr.Adapt(func(w http.ResponseWriter, r *http.Request) error {
@@ -35,5 +45,5 @@ func WithOnlyTrustedSubnet(header string, subnet string) func(http.Handler) http
 			h.ServeHTTP(w, r)
 			return nil
 		})
-	}
+	}, nil
 }

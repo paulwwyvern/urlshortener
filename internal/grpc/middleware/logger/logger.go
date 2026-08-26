@@ -15,11 +15,18 @@ func UnaryLoggerInterceptor(logger *zap.Logger) grpc.UnaryServerInterceptor {
 
 		resp, err := handler(ctx, req)
 
-		logger.Info("GRPC request",
-			zap.String("method", method),
-			zap.Int32("user id", userID),
-			zap.Error(err),
-		)
+		if err != nil {
+			logger.Info("GRPC request with error",
+				zap.String("method", method),
+				zap.Int32("user_id", userID),
+				zap.Error(err),
+			)
+		} else {
+			logger.Info("GRPC request",
+				zap.String("method", method),
+				zap.Int32("user_id", userID),
+			)
+		}
 
 		return resp, err
 	}
