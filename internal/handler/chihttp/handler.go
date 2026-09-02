@@ -22,6 +22,7 @@ type ShortenerService interface {
 	GenerateURL(ctx context.Context, userID int32, url string) (string, error)
 	GenerateURLBatch(ctx context.Context, userID int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error)
 	DeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
+	GetStats(ctx context.Context) (dto.GetStatsResponse, error)
 	Ping(ctx context.Context) error
 }
 
@@ -68,7 +69,7 @@ func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	userID := httpuser.GetUserID(r)
+	userID := httpuser.GetUserID(r.Context())
 
 	url := string(body)
 
@@ -85,7 +86,7 @@ func (h *Handler) generateURL(w http.ResponseWriter, r *http.Request) error {
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	httpurl.SetURL(r, url)
+	httpurl.SetURL(r.Context(), url)
 	w.Write([]byte(shortURL))
 
 	return nil
@@ -124,7 +125,7 @@ func (h *Handler) getURL(w http.ResponseWriter, r *http.Request) error {
 		return nil
 	}
 
-	httpurl.SetURL(r, url)
+	httpurl.SetURL(r.Context(), url)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	return nil
 }
@@ -144,7 +145,7 @@ func (h *Handler) GetUserURLs(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) getUserURLs(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
-	userID := httpuser.GetUserID(r)
+	userID := httpuser.GetUserID(r.Context())
 
 	userURLs, err := h.service.GetUserURLs(ctx, userID)
 	if err != nil {
@@ -205,7 +206,7 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	userID := httpuser.GetUserID(r)
+	userID := httpuser.GetUserID(r.Context())
 
 	url, err := h.service.GenerateURL(ctx, userID, req.URL)
 
@@ -232,7 +233,7 @@ func (h *Handler) generateURLJson(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 
-	httpurl.SetURL(r, url)
+	httpurl.SetURL(r.Context(), url)
 
 	return nil
 }
@@ -271,7 +272,7 @@ func (h *Handler) generateURLJsonBatch(w http.ResponseWriter, r *http.Request) e
 		return err
 	}
 
-	userID := httpuser.GetUserID(r)
+	userID := httpuser.GetUserID(r.Context())
 
 	res, err := h.service.GenerateURLBatch(ctx, userID, req)
 	if err != nil {
@@ -325,7 +326,7 @@ func (h *Handler) deleteURLJsonBatch(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 
-	userID := httpuser.GetUserID(r)
+	userID := httpuser.GetUserID(r.Context())
 	err = h.service.DeleteURLBatch(ctx, userID, req)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -334,6 +335,36 @@ func (h *Handler) deleteURLJsonBatch(w http.ResponseWriter, r *http.Request) err
 	w.Header().Set("Content-Type", "application/json")
 
 	w.WriteHeader(http.StatusAccepted)
+	return nil
+}
+
+// GetStats возвращает статистику(количество зареганных урлов и юзеров)
+//
+// Возвращаемые коды:
+//
+// 200 - Всё ок
+//
+// 500 - внутренняя ошибка сервера
+func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
+	httperr.Adapt(h.getStats)(w, r)
+}
+
+func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	stats, err := h.service.GetStats(ctx)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(stats)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

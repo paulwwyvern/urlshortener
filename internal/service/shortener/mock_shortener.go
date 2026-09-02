@@ -42,6 +42,21 @@ func (m *MockURLRepository) EXPECT() *MockURLRepositoryMockRecorder {
 	return m.recorder
 }
 
+// CreateUser mocks base method.
+func (m *MockURLRepository) CreateUser(ctx context.Context) (int32, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateUser", ctx)
+	ret0, _ := ret[0].(int32)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateUser indicates an expected call of CreateUser.
+func (mr *MockURLRepositoryMockRecorder) CreateUser(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockURLRepository)(nil).CreateUser), ctx)
+}
+
 // GetShortURL mocks base method.
 func (m *MockURLRepository) GetShortURL(ctx context.Context, url string) (string, error) {
 	m.ctrl.T.Helper()
@@ -72,19 +87,49 @@ func (mr *MockURLRepositoryMockRecorder) GetURL(ctx, shortURL any) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetURL", reflect.TypeOf((*MockURLRepository)(nil).GetURL), ctx, shortURL)
 }
 
-// GetUserURL mocks base method.
-func (m *MockURLRepository) GetUserURL(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
+// GetURLCount mocks base method.
+func (m *MockURLRepository) GetURLCount(ctx context.Context) (int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserURL", ctx, userId)
+	ret := m.ctrl.Call(m, "GetURLCount", ctx)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetURLCount indicates an expected call of GetURLCount.
+func (mr *MockURLRepositoryMockRecorder) GetURLCount(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetURLCount", reflect.TypeOf((*MockURLRepository)(nil).GetURLCount), ctx)
+}
+
+// GetUserCount mocks base method.
+func (m *MockURLRepository) GetUserCount(ctx context.Context) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserCount", ctx)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUserCount indicates an expected call of GetUserCount.
+func (mr *MockURLRepositoryMockRecorder) GetUserCount(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserCount", reflect.TypeOf((*MockURLRepository)(nil).GetUserCount), ctx)
+}
+
+// GetUserURL mocks base method.
+func (m *MockURLRepository) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUserURL", ctx, userID)
 	ret0, _ := ret[0].([]dto.GetUserURLResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetUserURL indicates an expected call of GetUserURL.
-func (mr *MockURLRepositoryMockRecorder) GetUserURL(ctx, userId any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) GetUserURL(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURL", reflect.TypeOf((*MockURLRepository)(nil).GetUserURL), ctx, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURL", reflect.TypeOf((*MockURLRepository)(nil).GetUserURL), ctx, userID)
 }
 
 // Ping mocks base method.
@@ -102,45 +147,45 @@ func (mr *MockURLRepositoryMockRecorder) Ping(arg0 any) *gomock.Call {
 }
 
 // SaveURL mocks base method.
-func (m *MockURLRepository) SaveURL(ctx context.Context, userId int32, shortURL, url string) error {
+func (m *MockURLRepository) SaveURL(ctx context.Context, userID int32, shortURL, url string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveURL", ctx, userId, shortURL, url)
+	ret := m.ctrl.Call(m, "SaveURL", ctx, userID, shortURL, url)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SaveURL indicates an expected call of SaveURL.
-func (mr *MockURLRepositoryMockRecorder) SaveURL(ctx, userId, shortURL, url any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) SaveURL(ctx, userID, shortURL, url any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURL", reflect.TypeOf((*MockURLRepository)(nil).SaveURL), ctx, userId, shortURL, url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURL", reflect.TypeOf((*MockURLRepository)(nil).SaveURL), ctx, userID, shortURL, url)
 }
 
 // SaveURLBatch mocks base method.
-func (m *MockURLRepository) SaveURLBatch(ctx context.Context, userId int32, urls []model.URL) error {
+func (m *MockURLRepository) SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SaveURLBatch", ctx, userId, urls)
+	ret := m.ctrl.Call(m, "SaveURLBatch", ctx, userID, urls)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SaveURLBatch indicates an expected call of SaveURLBatch.
-func (mr *MockURLRepositoryMockRecorder) SaveURLBatch(ctx, userId, urls any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) SaveURLBatch(ctx, userID, urls any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURLBatch", reflect.TypeOf((*MockURLRepository)(nil).SaveURLBatch), ctx, userId, urls)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveURLBatch", reflect.TypeOf((*MockURLRepository)(nil).SaveURLBatch), ctx, userID, urls)
 }
 
 // SoftDeleteURLBatch mocks base method.
-func (m *MockURLRepository) SoftDeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error {
+func (m *MockURLRepository) SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SoftDeleteURLBatch", ctx, userId, shortURLs)
+	ret := m.ctrl.Call(m, "SoftDeleteURLBatch", ctx, userID, shortURLs)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SoftDeleteURLBatch indicates an expected call of SoftDeleteURLBatch.
-func (mr *MockURLRepositoryMockRecorder) SoftDeleteURLBatch(ctx, userId, shortURLs any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) SoftDeleteURLBatch(ctx, userID, shortURLs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteURLBatch", reflect.TypeOf((*MockURLRepository)(nil).SoftDeleteURLBatch), ctx, userId, shortURLs)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDeleteURLBatch", reflect.TypeOf((*MockURLRepository)(nil).SoftDeleteURLBatch), ctx, userID, shortURLs)
 }
 
 // MockURLGenerator is a mock of URLGenerator interface.

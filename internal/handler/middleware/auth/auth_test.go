@@ -1,21 +1,23 @@
 package auth
 
 import (
-	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
+
+	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
+	"github.com/paulwwyvern/urlshortener/pkg/jwt"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 //go:generate mockgen -source=auth.go -destination=mock_auth.go -package=auth
 
 func echoUser(w http.ResponseWriter, r *http.Request) {
 
-	user := httpuser.GetUserID(r)
+	user := httpuser.GetUserID(r.Context())
 
 	w.WriteHeader(200)
 	w.Write([]byte(strconv.Itoa(int(user))))
@@ -44,7 +46,7 @@ func TestAuth_Success(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, "/", nil)
 			w := httptest.NewRecorder()
 
-			token, _ := CreateJWTToken(tt.key, tt.want)
+			token, _ := jwt.CreateJWTToken(tt.key, tt.want)
 			r.AddCookie(&http.Cookie{
 				Name:  "Token",
 				Value: token,
@@ -93,7 +95,7 @@ func TestAuth_WithoutToken(t *testing.T) {
 
 			require.NotNil(t, cookie)
 
-			token, _ := CreateJWTToken(tt.key, tt.want)
+			token, _ := jwt.CreateJWTToken(tt.key, tt.want)
 			assert.Equal(t, token, cookie.Value)
 		})
 	}
@@ -120,7 +122,7 @@ func TestAuthRequire_Success(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, "/", nil)
 			w := httptest.NewRecorder()
 
-			token, _ := CreateJWTToken(tt.key, tt.want)
+			token, _ := jwt.CreateJWTToken(tt.key, tt.want)
 			r.AddCookie(&http.Cookie{
 				Name:  "Token",
 				Value: token,

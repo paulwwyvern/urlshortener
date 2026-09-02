@@ -7,6 +7,7 @@ import (
 
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httperr"
 	"github.com/paulwwyvern/urlshortener/pkg/httphelpers/httpuser"
+	"github.com/paulwwyvern/urlshortener/pkg/jwt"
 )
 
 type ErrUserNotFound struct {
@@ -53,7 +54,7 @@ func WithAuthRequire(key string) func(http.Handler) http.Handler {
 				return err
 			}
 
-			httpuser.SetUserID(r, userID)
+			*r = *r.WithContext(httpuser.SetUserID(r.Context(), userID))
 
 			h.ServeHTTP(w, r)
 
@@ -83,7 +84,7 @@ func WithAuth(key string, userService UserService) func(http.Handler) http.Handl
 					return err
 				}
 
-				token, err := CreateJWTToken(key, userID)
+				token, err := jwt.CreateJWTToken(key, userID)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					return err
@@ -99,7 +100,7 @@ func WithAuth(key string, userService UserService) func(http.Handler) http.Handl
 				http.SetCookie(w, cookie)
 			}
 
-			httpuser.SetUserID(r, userID)
+			*r = *r.WithContext(httpuser.SetUserID(r.Context(), userID))
 
 			h.ServeHTTP(w, r)
 
@@ -119,7 +120,7 @@ func GetUserID(key string, r *http.Request) (int32, error) {
 	}
 	token := cookie.Value
 
-	userID, err := GetUserIDFromJWTToken(key, token)
+	userID, err := jwt.GetUserIDFromJWTToken(key, token)
 
 	if err != nil {
 		return 0, NewErrUserNotFound(err, "JWT token parse error")

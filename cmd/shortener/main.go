@@ -13,12 +13,22 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	grpcmwauth "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
+	grpcmwselector "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/selector"
+	"github.com/paulwwyvern/urlshortener/api/proto"
 	"github.com/paulwwyvern/urlshortener/internal/config"
+	grpcserver "github.com/paulwwyvern/urlshortener/internal/grpc"
+	grpcmwauthfunc "github.com/paulwwyvern/urlshortener/internal/grpc/middleware/auth"
+	grpcmwlogger "github.com/paulwwyvern/urlshortener/internal/grpc/middleware/logger"
+	grpcmwselectormatcher "github.com/paulwwyvern/urlshortener/internal/grpc/middleware/selector"
 	"github.com/paulwwyvern/urlshortener/internal/handler/chihttp"
 	mwaudit "github.com/paulwwyvern/urlshortener/internal/handler/middleware/audit"
 	mwauth "github.com/paulwwyvern/urlshortener/internal/handler/middleware/auth"
 	mwcompress "github.com/paulwwyvern/urlshortener/internal/handler/middleware/compress"
 	mwlogger "github.com/paulwwyvern/urlshortener/internal/handler/middleware/logger"
+	mwtrusted "github.com/paulwwyvern/urlshortener/internal/handler/middleware/trusted"
+	"google.golang.org/grpc"
+
 	"github.com/paulwwyvern/urlshortener/internal/model"
 	"github.com/paulwwyvern/urlshortener/internal/model/dto"
 	auditlog "github.com/paulwwyvern/urlshortener/internal/repository/audit"
@@ -26,7 +36,6 @@ import (
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/inmemory"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/postgres"
 	"github.com/paulwwyvern/urlshortener/internal/repository/storage/throughcache"
-	"github.com/paulwwyvern/urlshortener/internal/repository/userstorage"
 	auditpub "github.com/paulwwyvern/urlshortener/internal/service/audit"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener"
 	"github.com/paulwwyvern/urlshortener/internal/service/shortener/workers"
@@ -63,16 +72,21 @@ const (
 	purgeInterval     = 10 * time.Second
 
 	cacheCapacity = 10
+
+	userIPHeader = "X-Real-IP"
 )
 
 type URLRepository interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
 	GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error)
+	GetURLCount(ctx context.Context) (int, error)
 	SaveURL(ctx context.Context, userID int32, shortURL string, url string) error
 	SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error
 	SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
 	PurgeURLBatch(ctx context.Context, urls []string) error
+	CreateUser(ctx context.Context) (int32, error)
+	GetUserCount(ctx context.Context) (int, error)
 	Ping(context.Context) error
 	Close() error
 }
@@ -137,9 +151,6 @@ func main() {
 		logger.Info("repository closed", zap.Error(err))
 	}()
 
-	// init user repo
-	userRepo := userstorage.NewStorage()
-
 	// init generator
 	generator := strgenerator.NewGenerator(
 		strgenerator.Digits+strgenerator.UppercaseLatin+strgenerator.LowercaseLatin,
@@ -169,7 +180,7 @@ func main() {
 		logger.Info("shortener service closed", zap.Error(err))
 	}()
 
-	userService := user.NewService(logger, userRepo)
+	userService := user.NewService(logger, repo)
 
 	// audit
 
@@ -221,12 +232,21 @@ func main() {
 
 	// routes
 
+	mwOnlyTrusted, err := mwtrusted.WithOnlyTrustedSubnet(userIPHeader, conf.TrustedSubnet)
+	if err != nil {
+		logger.Fatal("Init trusted subnet middleware", zap.Error(err))
+	}
+
 	r.Use(mwlogger.WithLogger(logger))
 	r.Use(mwcompress.WithCompress())
 
 	r.Get("/ping", h.Ping)
 	r.Mount("/debug", middleware.Profiler())
 
+	r.Group(func(r chi.Router) {
+		r.Use(mwOnlyTrusted)
+		r.Get("/api/internal/stats", h.GetStats)
+	})
 	r.Group(func(r chi.Router) {
 		r.Use(mwaudit.WithAudit(logger, auditPub, "follow"))
 		r.Get("/{url}", h.GetURL)
@@ -259,6 +279,24 @@ func main() {
 		IdleTimeout:  serverIdleTimeout,
 	}
 
+	// init grpc server
+	gs := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			// интерцептор чтобы не все методы были защищены auth
+			grpcmwselector.UnaryServerInterceptor(
+				// непосредственно интерцептор авторизации из пакета grpc-ecosystem/go-grpc-middleware
+				grpcmwauth.UnaryServerInterceptor(grpcmwauthfunc.GetAuthFunc(authSignKey)),
+				// методы которые не должны быть защищены авторизацией
+				grpcmwselectormatcher.UnprotectedMethodMatcher(map[string]bool{
+					proto.ShortenerService_ExpandURL_FullMethodName: true,
+				}),
+			),
+			// логгер
+			grpcmwlogger.UnaryLoggerInterceptor(logger),
+		),
+	)
+	proto.RegisterShortenerServiceServer(gs, grpcserver.NewServer(logger, shortenerService))
+
 	// run server
 	servErr := make(chan error)
 	if conf.EnableHTTPS {
@@ -279,6 +317,19 @@ func main() {
 		}()
 	}
 
+	// run grpc server
+	go func() {
+		listen, err := net.Listen("tcp", conf.GRPCServerAddress)
+		if err != nil {
+			servErr <- err
+			return
+		}
+		logger.Info("Start gRPC server")
+		if err := gs.Serve(listen); err != nil {
+			servErr <- err
+		}
+	}()
+
 	select {
 	case err := <-servErr:
 		logger.Fatal("failed to start server", zap.Error(err))
@@ -290,8 +341,12 @@ func main() {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer shutdownCancel()
 
+	logger.Info("Start graceful shutdown server")
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("failed to graceful shutdown server", zap.Error(err))
 	}
+
+	logger.Info("Start graceful shutdown grpc server")
+	gs.GracefulStop()
 
 }

@@ -42,47 +42,62 @@ func (m *MockShortenerService) EXPECT() *MockShortenerServiceMockRecorder {
 }
 
 // DeleteURLBatch mocks base method.
-func (m *MockShortenerService) DeleteURLBatch(ctx context.Context, userId int32, shortURLs []string) error {
+func (m *MockShortenerService) DeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteURLBatch", ctx, userId, shortURLs)
+	ret := m.ctrl.Call(m, "DeleteURLBatch", ctx, userID, shortURLs)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteURLBatch indicates an expected call of DeleteURLBatch.
-func (mr *MockShortenerServiceMockRecorder) DeleteURLBatch(ctx, userId, shortURLs any) *gomock.Call {
+func (mr *MockShortenerServiceMockRecorder) DeleteURLBatch(ctx, userID, shortURLs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteURLBatch", reflect.TypeOf((*MockShortenerService)(nil).DeleteURLBatch), ctx, userId, shortURLs)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteURLBatch", reflect.TypeOf((*MockShortenerService)(nil).DeleteURLBatch), ctx, userID, shortURLs)
 }
 
 // GenerateURL mocks base method.
-func (m *MockShortenerService) GenerateURL(ctx context.Context, userId int32, url string) (string, error) {
+func (m *MockShortenerService) GenerateURL(ctx context.Context, userID int32, url string) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateURL", ctx, userId, url)
+	ret := m.ctrl.Call(m, "GenerateURL", ctx, userID, url)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateURL indicates an expected call of GenerateURL.
-func (mr *MockShortenerServiceMockRecorder) GenerateURL(ctx, userId, url any) *gomock.Call {
+func (mr *MockShortenerServiceMockRecorder) GenerateURL(ctx, userID, url any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateURL", reflect.TypeOf((*MockShortenerService)(nil).GenerateURL), ctx, userId, url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateURL", reflect.TypeOf((*MockShortenerService)(nil).GenerateURL), ctx, userID, url)
 }
 
 // GenerateURLBatch mocks base method.
-func (m *MockShortenerService) GenerateURLBatch(ctx context.Context, userId int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error) {
+func (m *MockShortenerService) GenerateURLBatch(ctx context.Context, userID int32, urls []dto.GenerateURLBatchRequest) ([]dto.GenerateURLBatchResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GenerateURLBatch", ctx, userId, urls)
+	ret := m.ctrl.Call(m, "GenerateURLBatch", ctx, userID, urls)
 	ret0, _ := ret[0].([]dto.GenerateURLBatchResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GenerateURLBatch indicates an expected call of GenerateURLBatch.
-func (mr *MockShortenerServiceMockRecorder) GenerateURLBatch(ctx, userId, urls any) *gomock.Call {
+func (mr *MockShortenerServiceMockRecorder) GenerateURLBatch(ctx, userID, urls any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateURLBatch", reflect.TypeOf((*MockShortenerService)(nil).GenerateURLBatch), ctx, userId, urls)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateURLBatch", reflect.TypeOf((*MockShortenerService)(nil).GenerateURLBatch), ctx, userID, urls)
+}
+
+// GetStats mocks base method.
+func (m *MockShortenerService) GetStats(ctx context.Context) (dto.GetStatsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStats", ctx)
+	ret0, _ := ret[0].(dto.GetStatsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStats indicates an expected call of GetStats.
+func (mr *MockShortenerServiceMockRecorder) GetStats(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStats", reflect.TypeOf((*MockShortenerService)(nil).GetStats), ctx)
 }
 
 // GetURL mocks base method.
@@ -101,18 +116,18 @@ func (mr *MockShortenerServiceMockRecorder) GetURL(ctx, shortURL any) *gomock.Ca
 }
 
 // GetUserURLs mocks base method.
-func (m *MockShortenerService) GetUserURLs(ctx context.Context, userId int32) ([]dto.GetUserURLResponse, error) {
+func (m *MockShortenerService) GetUserURLs(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserURLs", ctx, userId)
+	ret := m.ctrl.Call(m, "GetUserURLs", ctx, userID)
 	ret0, _ := ret[0].([]dto.GetUserURLResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetUserURLs indicates an expected call of GetUserURLs.
-func (mr *MockShortenerServiceMockRecorder) GetUserURLs(ctx, userId any) *gomock.Call {
+func (mr *MockShortenerServiceMockRecorder) GetUserURLs(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURLs", reflect.TypeOf((*MockShortenerService)(nil).GetUserURLs), ctx, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserURLs", reflect.TypeOf((*MockShortenerService)(nil).GetUserURLs), ctx, userID)
 }
 
 // Ping mocks base method.

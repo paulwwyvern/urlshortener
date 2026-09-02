@@ -11,10 +11,13 @@ type URLRepository interface {
 	GetURL(ctx context.Context, shortURL string) (string, error)
 	GetShortURL(ctx context.Context, url string) (string, error)
 	GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLResponse, error)
+	GetURLCount(ctx context.Context) (int, error)
 	SaveURL(ctx context.Context, userID int32, shortURL string, url string) error
 	SaveURLBatch(ctx context.Context, userID int32, urls []model.URL) error
 	SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs []string) error
 	PurgeURLBatch(ctx context.Context, urls []string) error
+	CreateUser(ctx context.Context) (int32, error)
+	GetUserCount(ctx context.Context) (int, error)
 	Ping(context.Context) error
 	Close() error
 }
@@ -63,6 +66,10 @@ func (c *Cache) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserURLR
 	return c.repo.GetUserURL(ctx, userID)
 }
 
+func (c *Cache) GetURLCount(ctx context.Context) (int, error) {
+	return c.repo.GetURLCount(ctx)
+}
+
 func (c *Cache) SaveURL(ctx context.Context, userID int32, shortURL string, url string) error {
 	err := c.repo.SaveURL(ctx, userID, shortURL, url)
 	if err != nil {
@@ -96,6 +103,14 @@ func (c *Cache) SoftDeleteURLBatch(ctx context.Context, userID int32, shortURLs 
 	}
 
 	return nil
+}
+
+func (c *Cache) CreateUser(ctx context.Context) (int32, error) {
+	return c.repo.CreateUser(ctx)
+}
+
+func (c *Cache) GetUserCount(ctx context.Context) (int, error) {
+	return c.repo.GetUserCount(ctx)
 }
 
 func (c *Cache) PurgeURLBatch(ctx context.Context, urls []string) error {

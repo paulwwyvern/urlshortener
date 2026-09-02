@@ -157,6 +157,21 @@ func (s *Storage) GetUserURL(ctx context.Context, userID int32) ([]dto.GetUserUR
 	return userURL, nil
 }
 
+// GetURLCount возвращает количество урлов
+func (s *Storage) GetURLCount(ctx context.Context) (int, error) {
+	stmt, err := s.db.PrepareContext(ctx, `SELECT COUNT(url) FROM url WHERE is_deleted = FALSE`)
+	if err != nil {
+		return 0, fmt.Errorf("GetURLCount: failed to prepare query: %w", err)
+	}
+	defer stmt.Close()
+	var count int
+	err = stmt.QueryRowContext(ctx).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("GetURLCount: failed to query rows: %w", err)
+	}
+	return count, nil
+}
+
 // SaveURL сохраняет в бд новый урл, созданный пользователем
 func (s *Storage) SaveURL(ctx context.Context, userID int32, shortURL string, originalURL string) error {
 	stmt, err := s.db.PrepareContext(ctx, `INSERT INTO url (short_url, url, user_id) VALUES ($1, $2, $3)`)
@@ -294,6 +309,36 @@ func (s *Storage) PurgeURLBatch(ctx context.Context, urls []string) error {
 		return fmt.Errorf("PurgeURLBatch: failed to commit transaction: %w", err)
 	}
 	return nil
+}
+
+func (s *Storage) CreateUser(ctx context.Context) (int32, error) {
+	stmt, err := s.db.PrepareContext(ctx, "INSERT INTO users DEFAULT VALUES RETURNING id")
+	if err != nil {
+		return 0, fmt.Errorf("CreateUser: failed to prepare query: %w", err)
+	}
+	defer stmt.Close()
+
+	var id int32
+	err = stmt.QueryRowContext(ctx).Scan(&id)
+	if err != nil {
+		return 0, fmt.Errorf("CreateUser: failed to query user: %w", err)
+	}
+	return id, nil
+}
+
+func (s *Storage) GetUserCount(ctx context.Context) (int, error) {
+	stmt, err := s.db.PrepareContext(ctx, "SELECT COUNT(*) FROM users")
+	if err != nil {
+		return 0, fmt.Errorf("GetUserCount: failed to prepare query: %w", err)
+	}
+	defer stmt.Close()
+
+	var count int
+	err = stmt.QueryRowContext(ctx).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("GetUserCount: failed to query users: %w", err)
+	}
+	return count, nil
 }
 
 // Close закрывает коннект к бд
